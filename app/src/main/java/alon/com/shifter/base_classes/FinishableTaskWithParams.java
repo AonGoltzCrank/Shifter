@@ -33,7 +33,7 @@ public abstract class FinishableTaskWithParams extends FinishableTask {
     /**
      * @return {@link #mParams}
      */
-    public HashMap<String, Object> getParams() {
+    protected HashMap<String, Object> getParams() {
         return mParams;
     }
 }

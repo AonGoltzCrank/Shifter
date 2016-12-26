@@ -23,6 +23,10 @@ public class Shift implements Serializable {
                 mShifts[j].set(i, selected[i + j * 4]);
     }
 
+    public Comment[] getComments() {
+        return mComments;
+    }
+
     public void setComments(Comment[] comments) {
         mComments = comments;
     }

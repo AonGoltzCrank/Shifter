@@ -1,5 +1,7 @@
 package alon.com.shifter.base_classes;
 
+import android.app.FragmentManager;
+
 /**
  * The Consts interface, short for Constants, is the base interface that almost all other classes implement, or use in one way or another.
  * This interface holds several classes, similar to the {@link alon.com.shifter.R} class.
@@ -14,10 +16,12 @@ package alon.com.shifter.base_classes;
  * <li>{@link Ints} - A constants set of integers, without a specific class for them, such as job type ints, and progress flags.</li>
  * <li>{@link Fc_Keys} - A constants set of all gate names used in {@link alon.com.shifter.utils.FlowController}.</li>
  * <li>{@link Linker_Keys} - A constants set of all values that can be used in the {@link Linker} class, including parameter names, and linker type flags.</li>
+ * <li>{@link DialogFragment_Keys} - A constants set of all values that are used when calling {@link android.app.DialogFragment#show(FragmentManager, String)} as the tag parameter.</li>
  * </ul>
  *
  * @since V.1.0
  */
+@SuppressWarnings("ALL")
 public interface Consts {
     /**
      * INSTRUCTIONS:
@@ -35,6 +39,8 @@ public interface Consts {
 
         public static final String SHIFT_SETUP_SEC_SPECIAL_SETTINGS_TYPES = "special-shift-settings";
         public static final String USER_BASE_USER_OBJECT = "base-user-seralizeable";
+
+        public static final String USER_SHIFT_INFO = "";
 
         public static final String MGR_SEC_SPEC_SETTINGS_SET = "special-settings-object";
     }
@@ -66,8 +72,10 @@ public interface Consts {
         public static final String LOG_PERMA_LOGIN_EMAIL = ">>perma_login_email<<";
 
         public static final String MGR_SEC_COMPLETE_SPEC_SETTINGS = ">>complete_shift_info<<";
-        public static final String MGR_SEC_SPEC_SETTINGS_RESTRICTIONS = ">>spec_settings_restrictions";
-        public static final String MGR_SEC_SPEC_SETTINGS = ">>spec_settings<<";
+        public static final String MGR_SEC_SPEC_SETTINGS_RESTRICTIONS = ">>spec_settings_restrictions<<";
+        public static final String MGR_SEC_SPEC_SETTINGS_EXPANDABLE = ">>spec_Settings_expandable<<";
+        public static final String USR_SPEC_SETTINGS = ">>spec_settings<<";
+        public static final String USR_SPEC_SETTINGS_OBJECT = ">>spec_settings_obj<<";
         public static final String MGR_SEC_SCHEDULE_SET = ">>constructed_schedule<<";
         public static final String MGR_SEC_USER_RQS = ">>user_requests<<";
         public static final String MGR_SEC_USER_LIST = ">>user_list<<";
@@ -90,6 +98,7 @@ public interface Consts {
         public static final int TYPE_UPLOAD_SPEC_SETTINGS = 0x183627;
         public static final int TYPE_DELETE_ACCOUNT = 0x0de989;
         public static final int TYPE_UPDATE_USER_ACCOUNTS = 0x07fea4;
+        public static final int TYPE_UPLOAD_SELECTED_SHIFTS_USER = 0x09b63c;
 
         public static final String KEY_LOGIN_PERSONAL_NAME = "name";
         public static final String KEY_LOGIN_EMAIL = "email";
@@ -145,6 +154,8 @@ public interface Consts {
         public static final String KEY_SHOULD_CHANGE_BACK_BUTTON = "ZK9kHT5XGAgQcudZMNdC";
 
         public static final String VALUE_DELETE_ACCOUNT = "plYcwgEx6PZJ0z0o5MJyCQ4oH2uLn8fyBJ8427H8";
+        public static final String VALUE_SHIFT_JSON_KEY = "json_shiftrqs_value";
+        public static final String VALUE_COMMENT_JSON_KEY = "json_comment_value";
     }
 
     /**
@@ -190,5 +201,11 @@ public interface Consts {
 
         public static final String USER_LIST_PULLED = "x2rOX9ktMji3J9sUxaEv";
         public static final String JOBS_PULLED = "8CANGzD1UkVFz2LFUtWo";
+    }
+
+    final class DialogFragment_Keys {
+        public static final String CONNECTION_KEY = "connection_dialog_key";
+        public static final String SHIFT_SUBMISSION_ERROR = "shift_submission_error_key";
+        public static final String UPLOADING_KEY = "uploading_data_key";
     }
 }

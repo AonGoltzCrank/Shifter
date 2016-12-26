@@ -12,6 +12,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
+import alon.com.shifter.base_classes.Consts;
+
 /**
  * Created by Alon on 11/11/2016.
  */
@@ -43,6 +45,8 @@ public final class SpecSettings implements Serializable {
     }
 
     public static SpecSettings fromString(String json) throws JSONException {
+        if (json.equals(Consts.Strings.NULL))
+            return getEmpty();
         ArrayList<String> headers = new ArrayList<>();
         HashMap<Integer, ArrayList<String>> childMap = new HashMap<>();
 

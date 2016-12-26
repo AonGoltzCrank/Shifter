@@ -1,5 +1,6 @@
 package alon.com.shifter.activities;
 
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -90,13 +91,21 @@ public class Activity_Special_Settings extends BaseActivity {
                     mItems.add(item.substring(0, childAmount == -1 ? item.lastIndexOf("=") : childAmount));
             }
             SpecSettings mSettings = SpecSettings.generateFromList(mItems);
-            try {
-                Linker linker = Linker.getLinker(Activity_Special_Settings.this, Linker_Keys.TYPE_UPLOAD_SPEC_SETTINGS);
-                linker.addParam(Linker_Keys.KEY_SPEC_SETTINGS, mSettings);
-                linker.execute();
-            } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e) {
-                e.printStackTrace();
-            }
+
+            new AsyncTaskWrapper(mSettings) {
+                @Override
+                protected Void doInBackground(Void... params) {
+                    try {
+                        Linker linker = Linker.getLinker(Activity_Special_Settings.this, Linker_Keys.TYPE_UPLOAD_SPEC_SETTINGS);
+                        linker.addParam(Linker_Keys.KEY_SPEC_SETTINGS, mSettings);
+                        linker.execute();
+                    } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                }
+            }.execute();
+
             mUtil.writeObject(this, Strings.FILE_SPEC_SETTINGS_OBJECT, mSettings);
             if (mChangeText)
                 mUtil.changeScreen(this, Activity_Shifter_Manager_Settings.class);
@@ -112,6 +121,14 @@ public class Activity_Special_Settings extends BaseActivity {
         mSpecView.setRestrictions(rest.split("=")[0], Integer.parseInt(rest.split("=")[1]));
         mSpecView.genViews();
         return mSpecView;
+    }
+
+    private abstract class AsyncTaskWrapper extends AsyncTask<Void, Void, Void> {
+        protected SpecSettings mSettings;
+
+        AsyncTaskWrapper(SpecSettings settings) {
+            mSettings = settings;
+        }
     }
 
 }

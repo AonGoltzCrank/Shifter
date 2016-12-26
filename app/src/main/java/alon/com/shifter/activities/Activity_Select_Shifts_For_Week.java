@@ -3,9 +3,12 @@ package alon.com.shifter.activities;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
 import alon.com.shifter.R;
 import alon.com.shifter.base_classes.BaseActivity;
@@ -70,41 +73,52 @@ public class Activity_Select_Shifts_For_Week extends BaseActivity {
         final FinishableTask mAcceptedShiftSetting = new FinishableTask() {
             @Override
             public void onFinish() {
-                try {
-                    AlertDialog mDialog;
-                    AlertDialog.Builder mBuilder = new AlertDialog.Builder(Activity_Select_Shifts_For_Week.this);
-                    mBuilder.setTitle(R.string.dialog_uploading_data)
-                            .setMessage(getString(R.string.mgr_uploading_data_add_spec_settings))
-                            .setCancelable(false)
-                            .setPositiveButton(getString(R.string.title_special_settings), new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    mUtil.writePref(Activity_Select_Shifts_For_Week.this, Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
-                                    Bundle mExtras = new Bundle();
-                                    mExtras.putBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON, false);
-                                    mUtil.changeScreen(Activity_Select_Shifts_For_Week.this, Activity_Special_Settings.class, mExtras);
-                                    Activity_Select_Shifts_For_Week.this.finish();
-                                }
-                            });
-                    mBuilder.setNegativeButton(getString(R.string.title_shift_hours), new DialogInterface.OnClickListener() { //Indentation is messed up for some reason.
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            mUtil.writePref(Activity_Select_Shifts_For_Week.this, Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
-                            Bundle mExtras = new Bundle();
-                            mExtras.putBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON, false);
-                            mUtil.changeScreen(Activity_Select_Shifts_For_Week.this, Activity_Shift_Hour_Setting.class, mExtras);
-                            Activity_Select_Shifts_For_Week.this.finish();
+                AlertDialog mDialog;
+                AlertDialog.Builder mBuilder = new AlertDialog.Builder(Activity_Select_Shifts_For_Week.this);
+                mBuilder.setTitle(R.string.dialog_uploading_data)
+                        .setMessage(getString(R.string.mgr_uploading_data_add_spec_settings))
+                        .setCancelable(false)
+                        .setPositiveButton(getString(R.string.title_special_settings), new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                mUtil.writePref(Activity_Select_Shifts_For_Week.this, Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
+                                Bundle mExtras = new Bundle();
+                                mExtras.putBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON, false);
+                                mUtil.changeScreen(Activity_Select_Shifts_For_Week.this, Activity_Special_Settings.class, mExtras);
+                                Activity_Select_Shifts_For_Week.this.finish();
+                            }
+                        });
+                mBuilder.setNegativeButton(getString(R.string.title_shift_hours), new DialogInterface.OnClickListener() { //Indentation is messed up for some reason.
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mUtil.writePref(Activity_Select_Shifts_For_Week.this, Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
+                        Bundle mExtras = new Bundle();
+                        mExtras.putBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON, false);
+                        mUtil.changeScreen(Activity_Select_Shifts_For_Week.this, Activity_Shift_Hour_Setting.class, mExtras);
+                        Activity_Select_Shifts_For_Week.this.finish();
+                    }
+                });
+                mDialog = mBuilder.create();
+                mDialog.show();
+                ((TextView) mDialog.findViewById(android.R.id.title)).setGravity(Gravity.RIGHT);
+
+                new AsyncTaskWrapper(mDialog, mShifts.getSelectedShifts()) {
+                    @Override
+                    protected Void doInBackground(Void... params) {
+                        try {
+
+                            Linker linker = Linker.getLinker(Activity_Select_Shifts_For_Week.this, Linker_Keys.TYPE_UPLOAD_SHIFT_SCHEDULE);
+                            linker.addParam(Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT, mShift);
+                            linker.addParam(Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG, mDialog);
+                            linker.execute();
+                        } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e)
+
+                        {
+                            e.printStackTrace();
                         }
-                    });
-                    mDialog = mBuilder.create();
-                    mDialog.show();
-                    Linker linker = Linker.getLinker(Activity_Select_Shifts_For_Week.this, Linker_Keys.TYPE_UPLOAD_SHIFT_SCHEDULE);
-                    linker.addParam(Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT, mShifts.getSelectedShifts());
-                    linker.addParam(Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG, mDialog);
-                    linker.execute();
-                } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e) {
-                    e.printStackTrace();
-                }
+                        return null;
+                    }
+                }.execute();
             }
         };
 
@@ -148,4 +162,16 @@ public class Activity_Select_Shifts_For_Week extends BaseActivity {
             }
         });
     }
+
+    private abstract class AsyncTaskWrapper extends AsyncTask<Void, Void, Void> {
+
+        protected AlertDialog mDialog;
+        protected Shift mShift;
+
+        AsyncTaskWrapper(AlertDialog dialog, Shift shift) {
+            mDialog = dialog;
+            mShift = shift;
+        }
+    }
+
 }

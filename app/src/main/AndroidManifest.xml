@@ -20,8 +20,12 @@
         android:windowSoftInputMode="adjustResize">
 
         <!-- User UI Main Screens -->
-        <activity android:name=".activities.Activity_Shifter_Main_User"/>
-        <activity android:name=".activities.Activity_Shifter_Main_Manager"/>
+        <activity
+            android:name=".activities.Activity_Shifter_Main_User"
+            android:screenOrientation="portrait"/>
+        <activity
+            android:name=".activities.Activity_Shifter_Main_Manager"
+            android:screenOrientation="portrait"/>
         <activity
             android:name=".activities.Activity_Select_Shifts_For_Week"
             android:screenOrientation="landscape"/>
@@ -34,10 +38,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity android:name=".activities.Activity_Special_Settings"/>
-        <activity android:name=".activities.Activity_Shifter_Manager_Settings"/>
-        <activity android:name=".activities.Activity_Shift_Hour_Setting"/>
-        <activity android:name=".activities.Activity_Shifter_Manager_AccMgr"/>
+        <activity
+            android:name=".activities.Activity_Special_Settings"
+            android:screenOrientation="portrait"/>
+        <activity
+            android:name=".activities.Activity_Shifter_Manager_Settings"
+            android:screenOrientation="portrait"/>
+        <activity
+            android:name=".activities.Activity_Shift_Hour_Setting"
+            android:screenOrientation="portrait"/>
+        <activity
+            android:name=".activities.Activity_Shifter_Manager_AccMgr"
+            android:screenOrientation="portrait"/>
         <activity
             android:name=".activities.Activity_Shifter_User_Submit"
             android:screenOrientation="landscape"/>

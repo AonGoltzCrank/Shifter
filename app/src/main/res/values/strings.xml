@@ -5,7 +5,7 @@
     <string name="err_failed_getting_info">משיכת מידע נכשלה</string>
     <string name="err_login_failed">ההתחברות נכשלה</string>
 
-    <string name="dialog_uploading_data">Uploading Data</string>
+    <string name="dialog_uploading_data">מעלה נתונים</string>
 
     <string name="shift_title_morn">בוקר</string>
     <string name="shift_title_afr_non">צהריים</string>
@@ -23,7 +23,7 @@
     <string name="login_email">אימייל</string>
     <string name="login_password">סיסמה</string>
 
-    <string name="logging_in">Connecting</string>
+    <string name="logging_in">מתחבר</string>
     <string name="please_wait">אנא המתן…</string>
 
     <string name="prob_password_dont_match">הסיסמאות לא תואמות</string>
@@ -125,4 +125,11 @@
     <string name="user_shift_submission_unapproved">על מנת לבור את המשמרות שאתם רוצים להגיש כ\"פתוח\" צריך ללחוץ על הכפתור התואם. לחיצה ארוכה תציג דיאלוג שבו תוכלו להוסיף הערה עבור המנהל.</string>
     <string name="user_shift_comment">הערה למנהל משמרות</string>
     <string name="user_show_shifts">הצג סידור</string>
+    <string name="user_shift_submission_error">שגיאה בעת הגשת משמרות</string>
+    <string name="err_shift_day_msg">עלייך להגיש משמרת אחת לפחות בימים:</string>
+    <string name="err_shift_shift_msg">עלייך להגיש אחת לשבוע משמרת:</string>
+    <string name="err_shift_amount_msg_1">עלייך להגיש לפחות</string>
+    <string name="err_shift_open_close_msg">המנהל אוסר עלייך להגיש סגירה ואז פתיחה.</string>
+    <string name="err_shift_amount_msg_2">משמרות בשבוע</string>
+    <string name="user_uploading_shifts">מעלה את המשמרת…</string>
 </resources>

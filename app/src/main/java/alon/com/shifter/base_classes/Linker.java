@@ -21,6 +21,7 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -39,6 +40,8 @@ import alon.com.shifter.R;
 import alon.com.shifter.activities.Activity_Shifter_Main_Manager;
 import alon.com.shifter.activities.Activity_Shifter_Main_User;
 import alon.com.shifter.base_classes.DelayedTaskExecutor.DelayedTask;
+import alon.com.shifter.dialog_fragments.ProgressDialogFragment;
+import alon.com.shifter.shift_utils.Comment;
 import alon.com.shifter.shift_utils.Shift;
 import alon.com.shifter.shift_utils.ShiftInfo;
 import alon.com.shifter.shift_utils.SpecSettings;
@@ -98,6 +101,11 @@ public class Linker {
      */
     private DelayedTaskExecutor mDelayedTaskExecutor;
 
+    /**
+     * A task to execute once the process has finished.
+     */
+    private FinishableTask mTaskOnFinish;
+
     //==================Factory Line==================
 
     private Linker(Activity caller, int type) {
@@ -130,7 +138,7 @@ public class Linker {
                 occupied[j++] = i;
         //Inform us what positions are empty.
         Log.i("LINKER_PROD_LINE_INF", "getLinker:\n" +
-                " Current amount of free linker slots: " + (limit - count) +
+                "Current amount of free linker slots: " + (count) +
                 "\nCurrent occupied linker positions: " + Arrays.toString(occupied));
         if (limit < currentNumberOfLinkers)
             throw new ProductionLineException();
@@ -311,745 +319,818 @@ public class Linker {
      * 12) Erases the linker.
      * </p>
      * </li>
+     * <li>
+     * <p>
+     * {@link alon.com.shifter.base_classes.Consts.Linker_Keys#TYPE_UPLOAD_SELECTED_SHIFTS_USER}<br>
+     * 1) Checks if:<br>
+     * - It has the {@link Shift} object.<br>
+     * 2)converts the values in the object to a json type,
+     * with only the selected values and comments (if a value isn't selected but has a comment, that comment is not registered to be uploaded.<br>
+     * 3) Uploads the value to the server.
+     * </p>
+     * </li>
      * </ul>
      *
      * @throws InsufficientParametersException
      *         - if the parameters needed to execute the linker doen't exists.
      */
     public void execute() throws InsufficientParametersException {
-        boolean containsAllRequiredParams;
-        switch (mType) {
-            //=====================================================================
-            case Consts.Linker_Keys.TYPE_LOGIN:
-                containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_DIALOG) &&
-                        mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PASS) &&
-                        mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_EMAIL));
-                if (containsAllRequiredParams) {
-                    final ProgressDialog mDialog = (ProgressDialog) mParams.get(Consts.Linker_Keys.KEY_LOGIN_DIALOG);
-                    final FinishableTask mFinishedUpdatingIP = new FinishableTask() {
-                        @Override
-                        public void onFinish() {
-                            if (mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_REMEMBER_ME))
-                                if ((boolean) mParams.get(Consts.Linker_Keys.KEY_LOGIN_REMEMBER_ME)) {
-                                    mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN, true);
-                                    mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN_PASS, mParams.get(Consts.Linker_Keys.KEY_LOGIN_PASS).toString());
-                                    mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN_EMAIL, mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString());
-                                }
-                            new BackgroundInfoFetcher().execute();
-                            if (FirebaseUtil.getUser().isManager())
-                                mCaller.startActivity(new Intent(mCaller, Activity_Shifter_Main_Manager.class));
-                            else
-                                mCaller.startActivity(new Intent(mCaller, Activity_Shifter_Main_User.class));
-                            mCaller.finish();
-                            erase();
-                        }
-                    };
-                    final TaskResult mFinishedGettingUser = new TaskResult() {
-                        @Override
-                        public void onFail() {
-                            mDialog.dismiss();
-                            mCaller.runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Toast.makeText(mCaller, R.string.err_login_failed, Toast.LENGTH_SHORT).show();
-                                    setGate(Consts.Fc_Keys.LOGIN_FAILED, true);
-                                }
-                            });
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            mDialog.dismiss();
-                            BaseUser mUser = FirebaseUtil.getUser();
-                            mUser.setIP((String) Util.getInstance(mCaller).readPref(mCaller, Consts.Pref_Keys.USR_IP, Consts.Strings.NULL));
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.USERS).child(mUser.getUID())
-                                    .child(Consts.Fb_Keys.USER_BASE_USER_OBJECT).setValue(mUser).addOnCompleteListener(mCaller, new OnCompleteListener<Void>() {
-                                @Override
-                                public void onComplete(@NonNull Task<Void> task) {
-                                    mFinishedUpdatingIP.onFinish();
-                                }
-                            });
-                        }
-                    };
-                    final TaskResult mLoggedIn = new TaskResult() {
-                        @Override
-                        public void onFail() {
-                            mDialog.dismiss();
-                            mCaller.runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Toast.makeText(mCaller, R.string.err_login_failed, Toast.LENGTH_SHORT).show();
-                                    setGate(Consts.Fc_Keys.LOGIN_FAILED, true);
-                                }
-                            });
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            FirebaseUtil.getUserFromDatabase(mFinishedGettingUser);
-                        }
-                    };
-                    FirebaseUtil.login(mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString(), mParams.get(Consts.Linker_Keys.KEY_LOGIN_PASS).toString(), mCaller, mLoggedIn);
-                } else
-                    throw new InsufficientParametersException();
-                break;
-            //=====================================================================
-            case Consts.Linker_Keys.TYPE_REGISTER:
-                containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_DIALOG) &&
-                        mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_WORKPLACE_CODE) &&
-                        mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_EMAIL) &&
-                        mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PERSONAL_NAME) &&
-                        mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PASS) &&
-                        mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PHONE));
-                if (containsAllRequiredParams) {
-                    final ProgressDialog mDialog = (ProgressDialog) mParams.get(Consts.Linker_Keys.KEY_LOGIN_DIALOG);
-                    final FinishableTask mFinishedProcess = new FinishableTask() {
-                        @Override
-                        public void onFinish() {
-                            if (mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_REMEMBER_ME)) {
-                                mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN, true);
-                                mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN_EMAIL, mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL));
-                                mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN_PASS, mParams.get(Consts.Linker_Keys.KEY_LOGIN_PASS));
-                            }
-                            new BackgroundInfoFetcher().execute();
-                            if (FirebaseUtil.getUser().isManager())
-                                mCaller.startActivity(new Intent(mCaller, Activity_Shifter_Main_Manager.class));
-                            else {
-                                FirebaseUtil.insertRequest(FirebaseUtil.getUser());
-                                mCaller.startActivity(new Intent(mCaller, Activity_Shifter_Main_User.class));
-                            }
-                            erase();
-                        }
-                    };
-                    final TaskResult mRegistered = new TaskResult() {
-                        @Override
-                        public void onFail() {
-                            mDialog.dismiss();
-                            mCaller.runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Toast.makeText(mCaller, R.string.register_err_unspecefied_err, Toast.LENGTH_SHORT).show();
-                                }
-                            });
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            FirebaseUtil.getShorthandCode(new FinishableTask() {
-                                @Override
-                                public void onFinish() {
-                                    BaseUser mUser =
-                                            new BaseUser(FirebaseUtil.getUser().getUID(),
-                                                    mParams.get(Consts.Linker_Keys.KEY_LOGIN_PERSONAL_NAME).toString(),
-                                                    mParams.get(Consts.Linker_Keys.KEY_LOGIN_PHONE).toString(),
-                                                    Util.getInstance(mCaller).readPref(mCaller, Consts.Pref_Keys.USR_IP, Consts.Strings.NULL).toString(),
-                                                    FirebaseUtil.getUser().getSHCode(),
-                                                    mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString(), false,
-                                                    mParams.get(Consts.Linker_Keys.KEY_LOGIN_WORKPLACE_CODE).toString());
-                                    FirebaseUtil.setUser(mUser);
-                                    FirebaseUtil.getDatabase(Consts.Fb_Dirs.USERS).child(mUser.getUID())
-                                            .child(Consts.Fb_Keys.USER_BASE_USER_OBJECT).setValue(mUser).addOnCompleteListener(mCaller, new OnCompleteListener<Void>() {
-                                        @Override
-                                        public void onComplete(@NonNull Task<Void> task) {
-                                            mFinishedProcess.onFinish();
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                    };
-                    final TaskResult mEmailVerified = new TaskResult() {
-                        @Override
-                        public void onFail() {
-                            mDialog.dismiss();
-                            mCaller.runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Toast.makeText(mCaller, R.string.register_err_unspecefied_err, Toast.LENGTH_SHORT).show();
-                                }
-                            });
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            mDialog.setMessage(mCaller.getString(R.string.register_dialog_adding_you));
-                            FirebaseUtil.register(mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString(), mParams.get(Consts.Linker_Keys.KEY_LOGIN_PASS).toString(), mCaller, mRegistered);
-                        }
-                    };
-                    TaskResult mVerifiedCode = new TaskResult() {
-                        @Override
-                        public void onFail() {
-                            mDialog.dismiss();
-                            mCaller.runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Toast.makeText(mCaller, R.string.register_err_failed_to_validate_wrkplace_code, Toast.LENGTH_SHORT).show();
-                                }
-                            });
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            mDialog.setMessage(mCaller.getString(R.string.register_dialog_checking_email));
-                            Util.getInstance(mCaller).validateEmail(mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString(), mEmailVerified);
-                        }
-                    };
-                    FirebaseUtil.verifyCode((String) mParams.get(Consts.Linker_Keys.KEY_LOGIN_WORKPLACE_CODE), mVerifiedCode);
-                } else
-                    throw new InsufficientParametersException();
-                break;
-            //=====================================================================
-            case Consts.Linker_Keys.TYPE_UPLOAD_SHIFT_SCHEDULE:
-                containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT) && mParams.containsKey(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG));
-                if (containsAllRequiredParams) {
-                    final Shift mShift = (Shift) mParams.get(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT);
-                    final AlertDialog mDialog = (AlertDialog) mParams.get(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG);
-                    try {
-                        JSONObject mJson = new JSONObject();
-                        ShiftInfo[] mInfo = mShift.getInfoComplete();
-                        for (int i = 0; i < mInfo.length; i++) {
-                            String day = mUtil.getDayString(mCaller, i + 1);
-                            JSONObject mSubDay = new JSONObject();
-                            for (int j = 0; j < 4; j++)
-                                mSubDay.put(mUtil.getShiftTitle(mCaller, j), mInfo[i].getFor(j));
-                            mJson.put(day, mSubDay);
-                        }
-                        final FinishableTask mFinishedUploadingSpecSettings = new FinishableTask() {
+        try {
+            //TODO: REMOVE ALL FINALS
+            boolean containsAllRequiredParams;
+            switch (mType) {
+                //=====================================================================
+                case Consts.Linker_Keys.TYPE_LOGIN:
+                    containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_DIALOG) &&
+                            mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PASS) &&
+                            mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_EMAIL));
+                    if (containsAllRequiredParams) {
+                        final ProgressDialogFragment mDialog = (ProgressDialogFragment) mParams.get(Consts.Linker_Keys.KEY_LOGIN_DIALOG);
+                        final FinishableTask mFinishedUpdatingIP = new FinishableTask() {
                             @Override
                             public void onFinish() {
-                                mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
-                                mUtil.writeObject(mCaller, Consts.Strings.FILE_SHIFT_OBJECT, mShift);
-                                setGate(Consts.Fc_Keys.SCHDULE_INFO_UPLOADED, true);
+                                if (mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_REMEMBER_ME))
+                                    if ((boolean) mParams.get(Consts.Linker_Keys.KEY_LOGIN_REMEMBER_ME)) {
+                                        mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN, true);
+                                        mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN_PASS, mParams.get(Consts.Linker_Keys.KEY_LOGIN_PASS).toString());
+                                        mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN_EMAIL, mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString());
+                                    }
+                                new BackgroundInfoFetcher().execute();
+                                if (FirebaseUtil.getUser().isManager())
+                                    mCaller.startActivity(new Intent(mCaller, Activity_Shifter_Main_Manager.class));
+                                else
+                                    mCaller.startActivity(new Intent(mCaller, Activity_Shifter_Main_User.class));
+                                mCaller.finish();
                                 erase();
                             }
                         };
-                        FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode()).child(Consts.Fb_Keys.MGR_SEC_SHIFT_SCHEDULE)
-                                .setValue(mJson.toString()).addOnCompleteListener(mCaller, new OnCompleteListener<Void>() {
+                        final TaskResult mFinishedGettingUser = new TaskResult() {
                             @Override
-                            public void onComplete(@NonNull Task<Void> task) {
-                                if (task.isSuccessful())
-                                    mFinishedUploadingSpecSettings.onFinish();
-                                else {
-                                    Log.e(TAG, "onComplete: failed", task.getException());
-                                    mDialog.dismiss();
-                                    setGate(Consts.Fc_Keys.SCHDULE_INFO_UPLOADED, false);
-                                }
-                            }
-                        });
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                } else
-                    throw new InsufficientParametersException();
-                break;
-            //=====================================================================
-            case Consts.Linker_Keys.TYPE_INFO_FETCHER:
-                containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_IP_FETCH_ADDR));
-                if (containsAllRequiredParams) {
-                    Log.i(TAG, "execute: Data pull started on " + toString());
-                    String ipSite = mParams.get(Consts.Linker_Keys.KEY_IP_FETCH_ADDR).toString();
-                    try {
-                        URL mURL = new URL(ipSite);
-                        HttpURLConnection mConn = (HttpURLConnection) mURL.openConnection();
-                        InputStream stream = mConn.getInputStream();
-                        byte[] buffer = new byte[1024];
-                        int aRead = stream.read(buffer);
-                        mConn.disconnect();
-                        byte[] input = Arrays.copyOf(buffer, aRead);
-                        String ip = new String(input);
-                        mUtil.writePref(mCaller, Consts.Pref_Keys.USR_IP, ip);
-                        setGate(Consts.Fc_Keys.USER_IP_PULLED, true);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    final FinishableTask mFinishedInfoPull = new FinishableTask() {
-                        @Override
-                        public void onFinish() {
-                            Log.d(TAG, "onFinish: Done pulling info");
-                            erase();
-                        }
-                    };
-                    final TaskResult mGetJobTypes = new TaskResult() {
-                        @Override
-                        public void onFail() {
-
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.GENERAL_INFO).addListenerForSingleValueEvent(new ValueEventListener() {
-                                @Override
-                                public void onDataChange(DataSnapshot dataSnapshot) {
-                                    for (DataSnapshot mSnap : dataSnapshot.getChildren())
-                                        if (mSnap.getKey().equals(Consts.Fb_Keys.GENERAL_INFO_JOB_TYPES)) {
-                                            String mJobTypes = (String) mUtil.readPref(mCaller, Consts.Pref_Keys.GENERAL_INFO_JOB_TYPES, Consts.Strings.NULL);
-                                            String mPulledInfo = mSnap.getValue().toString();
-                                            if (!mJobTypes.equals(mPulledInfo)) {
-                                                mUtil.writePref(mCaller, Consts.Pref_Keys.GENERAL_INFO_JOB_TYPES, mPulledInfo);
-                                                Log.i(TAG, "onDataChange: Added info #8; Pulled job types");
-                                                setGate(Consts.Fc_Keys.JOBS_PULLED, true);
-                                                mFinishedInfoPull.onFinish();
-                                                return;
-                                            } else {
-                                                Log.i(TAG, "onDataChange: Didn't pull info #8.");
-                                                setGate(Consts.Fc_Keys.JOBS_PULLED, true);
-                                                mFinishedInfoPull.onFinish();
-                                            }
-                                        }
-                                }
-
-                                @Override
-                                public void onCancelled(DatabaseError databaseError) {
-                                    Log.e(TAG, "onCancelled: failed data pull #8", databaseError.toException());
-                                    Linker.this.onFailedBackgroundDataPull();
-                                }
-                            });
-                        }
-                    };
-                    final TaskResult mGetUserList = new TaskResult() {
-                        @Override
-                        public void onFail() {
-
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode()).addListenerForSingleValueEvent(new ValueEventListener() {
-                                @Override
-                                @SuppressWarnings("unchecked")
-                                public void onDataChange(DataSnapshot dataSnapshot) {
-                                    for (DataSnapshot mSnap : dataSnapshot.getChildren()) {
-                                        if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_USERS_ACCEPTED)) {
-                                            HashSet<String> mUsers = new HashSet<>();
-                                            mUsers.addAll(Arrays.asList(mSnap.getValue().toString().split("~")));
-                                            Set<String> currentUsers = (Set<String>) mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_LIST, new HashSet<String>());
-                                            if (!mUsers.equals(currentUsers)) {
-                                                mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_LIST, mUsers);
-                                                Log.i(TAG, "onDataChange: Added Info #7; Pulled User list.");
-                                            } else
-                                                Log.i(TAG, "onDataChange: Didn't pull info #7.");
-                                        }
+                            public void onFail() {
+                                mDialog.dismiss();
+                                mCaller.runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Toast.makeText(mCaller, R.string.err_login_failed, Toast.LENGTH_SHORT).show();
+                                        setGate(Consts.Fc_Keys.LOGIN_FAILED, true);
                                     }
-                                    setGate(Consts.Fc_Keys.USER_LIST_PULLED, true);
-                                    mGetJobTypes.onSucceed();
-                                }
+                                });
+                            }
 
+                            @Override
+                            public void onSucceed() {
+                                mDialog.dismiss();
+                                BaseUser mUser = FirebaseUtil.getUser();
+                                mUser.setIP((String) Util.getInstance(mCaller).readPref(mCaller, Consts.Pref_Keys.USR_IP, Consts.Strings.NULL));
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.USERS).child(mUser.getUID())
+                                        .child(Consts.Fb_Keys.USER_BASE_USER_OBJECT).setValue(mUser).addOnCompleteListener(mCaller, new OnCompleteListener<Void>() {
+                                    @Override
+                                    public void onComplete(@NonNull Task<Void> task) {
+                                        mFinishedUpdatingIP.onFinish();
+                                    }
+                                });
+                            }
+                        };
+                        final TaskResult mLoggedIn = new TaskResult() {
+                            @Override
+                            public void onFail() {
+                                mDialog.dismiss();
+                                mCaller.runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Toast.makeText(mCaller, R.string.err_login_failed, Toast.LENGTH_SHORT).show();
+                                        setGate(Consts.Fc_Keys.LOGIN_FAILED, true);
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                FirebaseUtil.getUserFromDatabase(mFinishedGettingUser);
+                            }
+                        };
+                        FirebaseUtil.login(mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString(), mParams.get(Consts.Linker_Keys.KEY_LOGIN_PASS).toString(), mCaller, mLoggedIn);
+                    } else
+                        throw new InsufficientParametersException();
+                    break;
+                //=====================================================================
+                case Consts.Linker_Keys.TYPE_REGISTER:
+                    containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_DIALOG) &&
+                            mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_WORKPLACE_CODE) &&
+                            mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_EMAIL) &&
+                            mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PERSONAL_NAME) &&
+                            mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PASS) &&
+                            mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PHONE));
+                    if (containsAllRequiredParams) {
+                        final ProgressDialog mDialog = (ProgressDialog) mParams.get(Consts.Linker_Keys.KEY_LOGIN_DIALOG);
+                        final FinishableTask mFinishedProcess = new FinishableTask() {
+                            @Override
+                            public void onFinish() {
+                                if (mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_REMEMBER_ME)) {
+                                    mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN, true);
+                                    mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN_EMAIL, mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL));
+                                    mUtil.writePref(mCaller, Consts.Pref_Keys.LOG_PERMA_LOGIN_PASS, mParams.get(Consts.Linker_Keys.KEY_LOGIN_PASS));
+                                }
+                                new BackgroundInfoFetcher().execute();
+                                if (FirebaseUtil.getUser().isManager())
+                                    mCaller.startActivity(new Intent(mCaller, Activity_Shifter_Main_Manager.class));
+                                else {
+                                    FirebaseUtil.insertRequest(FirebaseUtil.getUser());
+                                    mCaller.startActivity(new Intent(mCaller, Activity_Shifter_Main_User.class));
+                                }
+                                if (mTaskOnFinish != null) {
+                                    mTaskOnFinish.onFinish();
+                                    mTaskOnFinish = null;
+                                }
+                                erase();
+                            }
+                        };
+                        final TaskResult mRegistered = new TaskResult() {
+                            @Override
+                            public void onFail() {
+                                mDialog.dismiss();
+                                mCaller.runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Toast.makeText(mCaller, R.string.register_err_unspecefied_err, Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                FirebaseUtil.getShorthandCode(new FinishableTask() {
+                                    @Override
+                                    public void onFinish() {
+                                        BaseUser mUser =
+                                                new BaseUser(FirebaseUtil.getUser().getUID(),
+                                                        mParams.get(Consts.Linker_Keys.KEY_LOGIN_PERSONAL_NAME).toString(),
+                                                        mParams.get(Consts.Linker_Keys.KEY_LOGIN_PHONE).toString(),
+                                                        Util.getInstance(mCaller).readPref(mCaller, Consts.Pref_Keys.USR_IP, Consts.Strings.NULL).toString(),
+                                                        FirebaseUtil.getUser().getSHCode(),
+                                                        mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString(), false,
+                                                        mParams.get(Consts.Linker_Keys.KEY_LOGIN_WORKPLACE_CODE).toString());
+                                        FirebaseUtil.setUser(mUser);
+                                        FirebaseUtil.getDatabase(Consts.Fb_Dirs.USERS).child(mUser.getUID())
+                                                .child(Consts.Fb_Keys.USER_BASE_USER_OBJECT).setValue(mUser).addOnCompleteListener(mCaller, new OnCompleteListener<Void>() {
+                                            @Override
+                                            public void onComplete(@NonNull Task<Void> task) {
+                                                mFinishedProcess.onFinish();
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        };
+                        final TaskResult mEmailVerified = new TaskResult() {
+                            @Override
+                            public void onFail() {
+                                mDialog.dismiss();
+                                mCaller.runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Toast.makeText(mCaller, R.string.register_err_unspecefied_err, Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                mDialog.setMessage(mCaller.getString(R.string.register_dialog_adding_you));
+                                FirebaseUtil.register(mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString(), mParams.get(Consts.Linker_Keys.KEY_LOGIN_PASS).toString(), mCaller, mRegistered);
+                            }
+                        };
+                        TaskResult mVerifiedCode = new TaskResult() {
+                            @Override
+                            public void onFail() {
+                                mDialog.dismiss();
+                                mCaller.runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Toast.makeText(mCaller, R.string.register_err_failed_to_validate_wrkplace_code, Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                mDialog.setMessage(mCaller.getString(R.string.register_dialog_checking_email));
+                                Util.getInstance(mCaller).validateEmail(mParams.get(Consts.Linker_Keys.KEY_LOGIN_EMAIL).toString(), mEmailVerified);
+                            }
+                        };
+                        FirebaseUtil.verifyCode((String) mParams.get(Consts.Linker_Keys.KEY_LOGIN_WORKPLACE_CODE), mVerifiedCode);
+                    } else
+                        throw new InsufficientParametersException();
+                    break;
+                //=====================================================================
+                case Consts.Linker_Keys.TYPE_UPLOAD_SHIFT_SCHEDULE:
+                    containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT) && mParams.containsKey(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG));
+                    if (containsAllRequiredParams) {
+                        final Shift mShift = (Shift) mParams.get(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT);
+                        final AlertDialog mDialog = (AlertDialog) mParams.get(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG);
+                        try {
+                            JSONObject mJson = new JSONObject();
+                            ShiftInfo[] mInfo = mShift.getInfoComplete();
+                            for (int i = 0; i < mInfo.length; i++) {
+                                String day = mUtil.getDayString(mCaller, i + 1);
+                                JSONObject mSubDay = new JSONObject();
+                                for (int j = 0; j < 4; j++)
+                                    mSubDay.put(mUtil.getShiftTitle(mCaller, j), mInfo[i].getFor(j));
+                                mJson.put(day, mSubDay);
+                            }
+                            final FinishableTask mFinishedUploadingSpecSettings = new FinishableTask() {
                                 @Override
-                                public void onCancelled(DatabaseError databaseError) {
-                                    Log.e(TAG, "onCancelled: Failed data pull #7", databaseError.toException());
-                                    Linker.this.onFailedBackgroundDataPull();
+                                public void onFinish() {
+                                    mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
+                                    mUtil.writeObject(mCaller, Consts.Strings.FILE_SHIFT_OBJECT, mShift);
+                                    setGate(Consts.Fc_Keys.SCHDULE_INFO_UPLOADED, true);
+                                    if (mTaskOnFinish != null) {
+                                        mTaskOnFinish.onFinish();
+                                        mTaskOnFinish = null;
+                                    }
+                                    erase();
+                                }
+                            };
+                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode()).child(Consts.Fb_Keys.MGR_SEC_SHIFT_SCHEDULE)
+                                    .setValue(mJson.toString()).addOnCompleteListener(mCaller, new OnCompleteListener<Void>() {
+                                @Override
+                                public void onComplete(@NonNull Task<Void> task) {
+                                    if (task.isSuccessful())
+                                        mFinishedUploadingSpecSettings.onFinish();
+                                    else {
+                                        Log.e(TAG, "onComplete: failed", task.getException());
+                                        mDialog.dismiss();
+                                        setGate(Consts.Fc_Keys.SCHDULE_INFO_UPLOADED, false);
+                                    }
                                 }
                             });
+                        } catch (JSONException e) {
+                            e.printStackTrace();
                         }
-                    };
-                    final TaskResult mGetUserRequests = new TaskResult() {
-
-                        TaskResult mThis = this;
-
-                        @Override
-                        public void onFail() {
+                    } else
+                        throw new InsufficientParametersException();
+                    break;
+                //=====================================================================
+                case Consts.Linker_Keys.TYPE_INFO_FETCHER:
+                    containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_IP_FETCH_ADDR));
+                    if (containsAllRequiredParams) {
+                        Log.i(TAG, "execute: Data pull started on " + toString());
+                        String ipSite = mParams.get(Consts.Linker_Keys.KEY_IP_FETCH_ADDR).toString();
+                        try {
+                            URL mURL = new URL(ipSite);
+                            HttpURLConnection mConn = (HttpURLConnection) mURL.openConnection();
+                            InputStream stream = mConn.getInputStream();
+                            byte[] buffer = new byte[1024];
+                            int aRead = stream.read(buffer);
+                            mConn.disconnect();
+                            byte[] input = Arrays.copyOf(buffer, aRead);
+                            String ip = new String(input);
+                            mUtil.writePref(mCaller, Consts.Pref_Keys.USR_IP, ip);
+                            setGate(Consts.Fc_Keys.USER_IP_PULLED, true);
+                        } catch (IOException e) {
+                            e.printStackTrace();
                         }
-
-                        @Override
-                        public void onSucceed() {
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC_USER_REQUESTS).addListenerForSingleValueEvent(new ValueEventListener() {
-                                @Override
-                                public void onDataChange(DataSnapshot dataSnapshot) {
-                                    ArrayList<String> mUIDS = new ArrayList<>();
-                                    for (DataSnapshot mSnap : dataSnapshot.getChildren())
-                                        if (mSnap.getKey().equals(FirebaseUtil.getUser().getCode()))
-                                            for (DataSnapshot mChild : mSnap.getChildren())
-                                                mUIDS.add(mChild.getKey());
-                                    HashSet<String> mSet = new HashSet<>();
-                                    if (mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_RQS, mSet).equals(mSet) || !mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_RQS, mSet).equals(mUIDS)) {
-                                        mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_RQS, mUIDS);
-                                        Log.i(TAG, "onDataChange: Added Info #6; Pulled user requests.");
-                                    } else
-                                        Log.i(TAG, "onDataChange: Didn't pull info #6.");
-                                    setGate(Consts.Fc_Keys.USERS_RQS_LIST_PULLED, true);
-                                    mGetUserList.onSucceed();
+                        final FinishableTask mFinishedInfoPull = new FinishableTask() {
+                            @Override
+                            public void onFinish() {
+                                Log.d(TAG, "onFinish: Done pulling info");
+                                if (mTaskOnFinish != null) {
+                                    mTaskOnFinish.onFinish();
+                                    mTaskOnFinish = null;
                                 }
+                                erase();
+                            }
+                        };
+                        final TaskResult mGetJobTypes = new TaskResult() {
+                            @Override
+                            public void onFail() {
 
-                                @Override
-                                public void onCancelled(DatabaseError databaseError) {
-                                    Log.e(TAG, "onCancelled:  Failed data pull #6", databaseError.toException());
-                                    mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
-                                    mFinishedInfoPull.onFinish();
-                                }
-                            });
-                        }
-                    };
-                    final TaskResult mGetSpecSettingRestrictions = new TaskResult() {
+                            }
 
-                        private TaskResult mThis = this;
-
-                        @Override
-                        public void onFail() {
-                            Linker.this.onFailedBackgroundDataPull();
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.GENERAL_INFO)
-                                    .addListenerForSingleValueEvent(new ValueEventListener() {
-                                        @Override
-                                        public void onDataChange(final DataSnapshot dataSnapshot) {
-                                            for (DataSnapshot mSnap : dataSnapshot.getChildren()) {
-                                                if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_RESTRICTIONS)) {
-                                                    String restrictions = mSnap.getValue().toString();
-                                                    String currentRests = mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS_RESTRICTIONS, Consts.Strings.NULL).toString();
-                                                    if (!currentRests.equals(restrictions)) {
-                                                        mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS_RESTRICTIONS, restrictions);
-                                                        Log.i(TAG, "onDataChange: Added Info #5; Pulled spec setting restrictions.");
-                                                        mGetUserRequests.onSucceed();
-                                                        return;
-                                                    }
-                                                    setGate(Consts.Fc_Keys.SPEC_SETTING_RESTS_PULLED, true);
-                                                    Log.i(TAG, "onDataChange: Didn't pull info #5.");
-                                                    mGetUserRequests.onSucceed();
+                            @Override
+                            public void onSucceed() {
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.GENERAL_INFO).addListenerForSingleValueEvent(new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(DataSnapshot dataSnapshot) {
+                                        for (DataSnapshot mSnap : dataSnapshot.getChildren())
+                                            if (mSnap.getKey().equals(Consts.Fb_Keys.GENERAL_INFO_JOB_TYPES)) {
+                                                String mJobTypes = (String) mUtil.readPref(mCaller, Consts.Pref_Keys.GENERAL_INFO_JOB_TYPES, Consts.Strings.NULL);
+                                                String mPulledInfo = mSnap.getValue().toString();
+                                                if (!mJobTypes.equals(mPulledInfo)) {
+                                                    mUtil.writePref(mCaller, Consts.Pref_Keys.GENERAL_INFO_JOB_TYPES, mPulledInfo);
+                                                    Log.i(TAG, "onDataChange: Added info #8; Pulled job types");
+                                                    setGate(Consts.Fc_Keys.JOBS_PULLED, true);
+                                                    mFinishedInfoPull.onFinish();
+                                                    return;
+                                                } else {
+                                                    Log.i(TAG, "onDataChange: Didn't pull info #8.");
+                                                    setGate(Consts.Fc_Keys.JOBS_PULLED, true);
+                                                    mFinishedInfoPull.onFinish();
                                                 }
                                             }
-
-                                        }
-
-                                        @Override
-                                        public void onCancelled(DatabaseError databaseError) {
-                                            Log.e(TAG, "onCancelled:  Failed data pull #5", databaseError.toException());
-                                            mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
-                                            mGetUserRequests.onFail();
-                                        }
-                                    });
-                        }
-                    };
-                    final TaskResult mGetSpecSettingExpansions = new TaskResult() {
-
-                        private TaskResult mThis = this;
-
-                        @Override
-                        public void onFail() {
-                            Linker.this.onFailedBackgroundDataPull();
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.GENERAL_INFO).addListenerForSingleValueEvent(new ValueEventListener() {
-                                @Override
-                                public void onDataChange(DataSnapshot dataSnapshot) {
-                                    for (DataSnapshot mSnap : dataSnapshot.getChildren())
-                                        if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_EXPANDABLE)) {
-                                            String shifts = mSnap.getValue().toString();
-                                            String shiftCompleteInfo = (String) mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS, Consts.Strings.NULL);
-                                            shiftCompleteInfo += ";" + shifts;
-                                            if (shiftCompleteInfo.equals(Consts.Strings.NULL) || !shiftCompleteInfo.equals(mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_COMPLETE_SPEC_SETTINGS, Consts.Strings.NULL))) {
-                                                mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_COMPLETE_SPEC_SETTINGS, shiftCompleteInfo);
-                                                Log.i(TAG, "onDataChange: Added Info #4; Pulled spec settings expandable.");
-                                            }
-                                            setGate(Consts.Fc_Keys.SPEC_SETTINGS_EXPANDABLE_INFO_PULLED, true);
-                                            Log.i(TAG, "onDataChange: Didn't pull info #4.");
-                                            mGetSpecSettingRestrictions.onSucceed();
-                                        }
-                                }
-
-                                @Override
-                                public void onCancelled(DatabaseError databaseError) {
-                                    Log.e(TAG, "onCancelled:  Failed data pull #4", databaseError.toException());
-                                    mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
-                                    mGetSpecSettingRestrictions.onFail();
-                                }
-                            });
-                        }
-                    };
-                    final TaskResult mGetSpecSettings = new TaskResult() {
-
-                        private TaskResult mThis = this;
-
-                        @Override
-                        public void onFail() {
-                            Linker.this.onFailedBackgroundDataPull();
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.GENERAL_INFO).addListenerForSingleValueEvent(new ValueEventListener() {
-                                @Override
-                                public void onDataChange(DataSnapshot dataSnapshot) {
-                                    for (DataSnapshot mSnap : dataSnapshot.getChildren())
-                                        if (mSnap.getKey().equals(Consts.Fb_Keys.SHIFT_SETUP_SEC_SPECIAL_SETTINGS_TYPES)) {
-                                            String mSpecTypes = mSnap.getValue().toString();
-                                            if (!mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS, Consts.Strings.NULL).equals(mSpecTypes) ||
-                                                    mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS, Consts.Strings.NULL).equals(Consts.Strings.NULL)) {
-                                                Log.i(TAG, "onDataChange: Added Info #3; Pulled Shift spec settings.");
-                                                mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS, mSpecTypes);
-                                                mGetSpecSettingExpansions.onSucceed();
-                                            }
-                                            if (mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS, Consts.Strings.NULL).equals(mSpecTypes)) {
-                                                mGetSpecSettingExpansions.onSucceed();
-                                                Log.i(TAG, "onDataChange: Didn't pull info #3.");
-                                            }
-                                            setGate(Consts.Fc_Keys.SPEC_SETTINGS_TYPES_PULLED, true);
-                                            return;
-                                        }
-                                    Log.i(TAG, "onDataChange: Didn't pull #3.");
-                                }
-
-                                @Override
-                                public void onCancelled(DatabaseError databaseError) {
-                                    Log.e(TAG, "onCancelled: Failed data pull #3", databaseError.toException());
-                                    mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
-                                    mGetSpecSettingExpansions.onFail();
-                                }
-                            });
-                        }
-                    };
-                    final TaskResult mGetSpecSettingsSet = new TaskResult() {
-                        @Override
-                        public void onFail() {
-                            Linker.this.onFailedBackgroundDataPull();
-                        }
-
-                        @Override
-                        public void onSucceed() {
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode()).addListenerForSingleValueEvent(new ValueEventListener() {
-                                @Override
-                                public void onDataChange(DataSnapshot dataSnapshot) {
-                                    for (DataSnapshot mSnap : dataSnapshot.getChildren()) {
-                                        if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_SET)) {
-                                            SpecSettings mSettings = (SpecSettings) mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS, SpecSettings.getEmpty());
-                                            SpecSettings mPulledSettings;
-                                            try {
-                                                mPulledSettings = SpecSettings.fromString(mSnap.getValue().toString());
-                                            } catch (JSONException e) {
-                                                e.printStackTrace();
-                                                return;
-                                            }
-                                            if (mSettings.equals(SpecSettings.getEmpty()) || !mPulledSettings.equals(mSettings)) {
-                                                mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS, mPulledSettings);
-                                                Log.i(TAG, "onDataChange: Added Info #2; Pulled spec settings object.");
-                                                setGate(Consts.Fc_Keys.SPEC_SETTINGS_SET_PULLED, true);
-                                                if (FirebaseUtil.getUser().isManager())
-                                                    mGetSpecSettings.onSucceed();
-                                                else
-                                                    mFinishedInfoPull.onFinish();
-                                                return;
-                                            }
-                                            setGate(Consts.Fc_Keys.SPEC_SETTINGS_SET_PULLED, true);
-                                            Log.i(TAG, "onDataChange: Didn't pull #2.");
-                                        }
                                     }
-                                    Log.i(TAG, "onDataChange: Didn't pull #2.");
-                                    if (FirebaseUtil.getUser().isManager())
-                                        mGetSpecSettings.onSucceed();
-                                    else
+
+                                    @Override
+                                    public void onCancelled(DatabaseError databaseError) {
+                                        Log.e(TAG, "onCancelled: failed data pull #8", databaseError.toException());
+                                        Linker.this.onFailedBackgroundDataPull();
+                                    }
+                                });
+                            }
+                        };
+                        final TaskResult mGetUserList = new TaskResult() {
+                            @Override
+                            public void onFail() {
+
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode()).addListenerForSingleValueEvent(new ValueEventListener() {
+                                    @Override
+                                    @SuppressWarnings("unchecked")
+                                    public void onDataChange(DataSnapshot dataSnapshot) {
+                                        for (DataSnapshot mSnap : dataSnapshot.getChildren()) {
+                                            if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_USERS_ACCEPTED)) {
+                                                HashSet<String> mUsers = new HashSet<>();
+                                                mUsers.addAll(Arrays.asList(mSnap.getValue().toString().split("~")));
+                                                Set<String> currentUsers = (Set<String>) mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_LIST, new HashSet<String>());
+                                                if (!mUsers.equals(currentUsers)) {
+                                                    mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_LIST, mUsers);
+                                                    Log.i(TAG, "onDataChange: Added Info #7; Pulled User list.");
+                                                } else
+                                                    Log.i(TAG, "onDataChange: Didn't pull info #7.");
+                                            }
+                                        }
+                                        setGate(Consts.Fc_Keys.USER_LIST_PULLED, true);
+                                        mGetJobTypes.onSucceed();
+                                    }
+
+                                    @Override
+                                    public void onCancelled(DatabaseError databaseError) {
+                                        Log.e(TAG, "onCancelled: Failed data pull #7", databaseError.toException());
+                                        Linker.this.onFailedBackgroundDataPull();
+                                    }
+                                });
+                            }
+                        };
+                        final TaskResult mGetUserRequests = new TaskResult() {
+
+                            TaskResult mThis = this;
+
+                            @Override
+                            public void onFail() {
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC_USER_REQUESTS).addListenerForSingleValueEvent(new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(DataSnapshot dataSnapshot) {
+                                        ArrayList<String> mUIDS = new ArrayList<>();
+                                        for (DataSnapshot mSnap : dataSnapshot.getChildren())
+                                            if (mSnap.getKey().equals(FirebaseUtil.getUser().getCode()))
+                                                for (DataSnapshot mChild : mSnap.getChildren())
+                                                    mUIDS.add(mChild.getKey());
+                                        HashSet<String> mSet = new HashSet<>();
+                                        if (mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_RQS, mSet).equals(mSet) || !mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_RQS, mSet).equals(mUIDS)) {
+                                            mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_USER_RQS, mUIDS);
+                                            Log.i(TAG, "onDataChange: Added Info #6; Pulled user requests.");
+                                        } else
+                                            Log.i(TAG, "onDataChange: Didn't pull info #6.");
+                                        setGate(Consts.Fc_Keys.USERS_RQS_LIST_PULLED, true);
+                                        mGetUserList.onSucceed();
+                                    }
+
+                                    @Override
+                                    public void onCancelled(DatabaseError databaseError) {
+                                        Log.e(TAG, "onCancelled:  Failed data pull #6", databaseError.toException());
+                                        mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
                                         mFinishedInfoPull.onFinish();
-                                }
+                                    }
+                                });
+                            }
+                        };
+                        final TaskResult mGetSpecSettingRestrictions = new TaskResult() {
 
-                                @Override
-                                public void onCancelled(DatabaseError databaseError) {
-                                    Log.i(TAG, "onCancelled: Failed data pull # 2");
-                                    mGetSpecSettings.onFail();
-                                }
-                            });
-                        }
-                    };
-                    final FinishableTask mGetShifts = new FinishableTask() {
+                            private TaskResult mThis = this;
 
+                            @Override
+                            public void onFail() {
+                                Linker.this.onFailedBackgroundDataPull();
+                            }
 
-                        @Override
-                        public void onFinish() {
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode())
-                                    .addListenerForSingleValueEvent(new ValueEventListener() {
-                                        @Override
-                                        public void onDataChange(final DataSnapshot dataSnapshot) {
-                                            FinishableTask mTask = new FinishableTask() {
-                                                @Override
-                                                public void onFinish() {
-                                                    for (DataSnapshot mSnap : dataSnapshot.getChildren())
-                                                        if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_SHIFT_SCHEDULE)) {
-                                                            String shifts = mSnap.getValue().toString();
-                                                            String presShifts = (String) mUtil.readPref(mCaller, Consts.Pref_Keys.USR_SHIFT_SCHEDULE, Consts.Strings.NULL);
-                                                            Log.i(TAG, "onDataChange: Added Info #1; Pulled shift schedule.");
-                                                            if (presShifts.equals(Consts.Strings.NULL) || !presShifts.equals(shifts)) {
-                                                                mUtil.writePref(mCaller, Consts.Pref_Keys.USR_SHIFT_SCHEDULE, shifts);
-                                                                mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
-                                                            } else
-                                                                Log.i(TAG, "onDataChange: Didn't pull #1.");
-                                                            mGetSpecSettingsSet.onSucceed();
-                                                            setGate(Consts.Fc_Keys.SHIFT_SCHEDULE_SETTINGS_PULLED, true);
+                            @Override
+                            public void onSucceed() {
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.GENERAL_INFO)
+                                        .addListenerForSingleValueEvent(new ValueEventListener() {
+                                            @Override
+                                            public void onDataChange(final DataSnapshot dataSnapshot) {
+                                                for (DataSnapshot mSnap : dataSnapshot.getChildren()) {
+                                                    if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_RESTRICTIONS)) {
+                                                        String restrictions = mSnap.getValue().toString();
+                                                        String currentRests = mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS_RESTRICTIONS, Consts.Strings.NULL).toString();
+                                                        if (!currentRests.equals(restrictions)) {
+                                                            mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SPEC_SETTINGS_RESTRICTIONS, restrictions);
+                                                            Log.i(TAG, "onDataChange: Added Info #5; Pulled spec setting restrictions.");
+                                                            mGetUserRequests.onSucceed();
                                                             return;
                                                         }
-                                                    setGate(Consts.Fc_Keys.SHIFT_SCHEDULE_SETTINGS_PULLED, false);
-                                                    mGetSpecSettingsSet.onSucceed();
+                                                        setGate(Consts.Fc_Keys.SPEC_SETTING_RESTS_PULLED, true);
+                                                        Log.i(TAG, "onDataChange: Didn't pull info #5.");
+                                                        mGetUserRequests.onSucceed();
+                                                    }
                                                 }
-                                            };
-                                            if (!getIsGateOpen(Consts.Fc_Keys.LOGIN_OR_REGISTER_FINISHED)) {
-                                                addGateOpenListener(Consts.Fc_Keys.LOGIN_OR_REGISTER_FINISHED, mTask);
-                                            } else {
-                                                mTask.onFinish();
+
                                             }
-                                        }
 
-                                        @Override
-                                        public void onCancelled(DatabaseError databaseError) {
-                                            Log.e(TAG, "onCancelled: Failed data pull #1", databaseError.toException());
-                                            mGetSpecSettingExpansions.onFail();
-                                        }
-                                    });
-                        }
-                    };
-                    mGetShifts.onFinish();
-                } else
-                    throw new InsufficientParametersException();
-                break;
-            //=====================================================================
-            case Consts.Linker_Keys.TYPE_GET_PHONE_NUMBER:
-                containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_NUMBER_FETCHER_DIALOG) &&
-                        mParams.containsKey(Consts.Linker_Keys.KEY_NUMBER_FETCHER_DIALOG_VER) &&
-                        mParams.containsKey(Consts.Linker_Keys.KEY_NUMBER_FETCHER_TO));
-                if (containsAllRequiredParams) {
-                    final int verCode = new Random().nextInt(100000000);
-                    final String action = "android.provider.Telephony.SMS_RECEIVED";
+                                            @Override
+                                            public void onCancelled(DatabaseError databaseError) {
+                                                Log.e(TAG, "onCancelled:  Failed data pull #5", databaseError.toException());
+                                                mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
+                                                mGetUserRequests.onFail();
+                                            }
+                                        });
+                            }
+                        };
+                        final TaskResult mGetSpecSettingExpansions = new TaskResult() {
 
-                    final ProgressDialog mDialog = (ProgressDialog) mParams.get(Consts.Linker_Keys.KEY_NUMBER_FETCHER_DIALOG);
-                    final AlertDialog mVerDialog = (AlertDialog) mParams.get(Consts.Linker_Keys.KEY_NUMBER_FETCHER_DIALOG_VER);
+                            private TaskResult mThis = this;
 
-                    String toNumber = mParams.get(Consts.Linker_Keys.KEY_NUMBER_FETCHER_TO).toString();
-                    final String finalToNumber = toNumber;
-                    final TaskResult mResult = new TaskResult() {
-                        @Override
-                        public void onFail() {
-                            mDialog.dismiss();
-                            mCaller.runOnUiThread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    Toast.makeText(mCaller, R.string.phone_num_dialog_err_not_correct_number, Toast.LENGTH_SHORT).show();
-                                }
-                            });
-                            erase();
-                        }
+                            @Override
+                            public void onFail() {
+                                Linker.this.onFailedBackgroundDataPull();
+                            }
 
-                        @Override
-                        public void onSucceed() {
-                            mDialog.dismiss();
-                            mVerDialog.dismiss();
-                            mUtil.writePref(mCaller, Consts.Pref_Keys.USR_NUMBER, finalToNumber);
-                            erase();
-                        }
-                    };
-                    BroadcastReceiver mSmsReceieved = new BroadcastReceiver() {
-                        @Override
-                        public void onReceive(Context context, Intent intent) {
-                            if (intent.getAction().equals(action)) {
-                                try {
-                                    Bundle extras = intent.getExtras();
-                                    SmsMessage[] msgs;
-                                    String smsFrom;
-                                    if (extras != null) {
-                                        Object[] pdus = (Object[]) extras.get("pdus");
-                                        if (pdus != null) {
-                                            msgs = new SmsMessage[pdus.length];
-                                            for (int i = 0; i < msgs.length; i++) {
-                                                msgs[i] = SmsMessage.createFromPdu((byte[]) pdus[i]);
-                                                smsFrom = msgs[i].getOriginatingAddress();
-                                                if (smsFrom.startsWith("+972"))
-                                                    smsFrom = smsFrom.replace("+972", "0");
+                            @Override
+                            public void onSucceed() {
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.GENERAL_INFO).addListenerForSingleValueEvent(new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(DataSnapshot dataSnapshot) {
+                                        for (DataSnapshot mSnap : dataSnapshot.getChildren())
+                                            if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_EXPANDABLE)) {
+                                                String shifts = mSnap.getValue().toString();
+                                                String shiftCompleteInfo = (String) mUtil.readPref(mCaller, Consts.Pref_Keys.USR_SPEC_SETTINGS, Consts.Strings.NULL);
+                                                shiftCompleteInfo += ";" + shifts;
+                                                if (shiftCompleteInfo.equals(Consts.Strings.NULL) || !shiftCompleteInfo.equals(mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_COMPLETE_SPEC_SETTINGS, Consts.Strings.NULL))) {
+                                                    mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_COMPLETE_SPEC_SETTINGS, shiftCompleteInfo);
+                                                    Log.i(TAG, "onDataChange: Added Info #4; Pulled spec settings expandable.");
+                                                }
+                                                setGate(Consts.Fc_Keys.SPEC_SETTINGS_EXPANDABLE_INFO_PULLED, true);
+                                                Log.i(TAG, "onDataChange: Didn't pull info #4.");
+                                                if (FirebaseUtil.getUser().isManager())
+                                                    mGetSpecSettingRestrictions.onSucceed();
                                                 else
-                                                    throw new RuntimeException("Unknown country code.");
-                                                String smsBody = msgs[i].getMessageBody();
-                                                if (smsFrom.equals(finalToNumber) && smsBody.equals(Integer.toString(verCode))) {
-                                                    mDialog.dismiss();
-                                                    context.unregisterReceiver(this);
-                                                    mResult.onSucceed();
+                                                    mFinishedInfoPull.onFinish();
+                                            }
+                                    }
+
+                                    @Override
+                                    public void onCancelled(DatabaseError databaseError) {
+                                        Log.e(TAG, "onCancelled:  Failed data pull #4", databaseError.toException());
+                                        mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
+                                        mGetSpecSettingRestrictions.onFail();
+                                    }
+                                });
+                            }
+                        };
+                        final TaskResult mGetSpecSettings = new TaskResult() {
+
+                            private TaskResult mThis = this;
+
+                            @Override
+                            public void onFail() {
+                                Linker.this.onFailedBackgroundDataPull();
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.GENERAL_INFO).addListenerForSingleValueEvent(new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(DataSnapshot dataSnapshot) {
+                                        for (DataSnapshot mSnap : dataSnapshot.getChildren())
+                                            if (mSnap.getKey().equals(Consts.Fb_Keys.SHIFT_SETUP_SEC_SPECIAL_SETTINGS_TYPES)) {
+                                                String mSpecTypes = mSnap.getValue().toString();
+                                                if (!mUtil.readPref(mCaller, Consts.Pref_Keys.USR_SPEC_SETTINGS, Consts.Strings.NULL).equals(mSpecTypes) ||
+                                                        mUtil.readPref(mCaller, Consts.Pref_Keys.USR_SPEC_SETTINGS, Consts.Strings.NULL).equals(Consts.Strings.NULL)) {
+                                                    Log.i(TAG, "onDataChange: Added Info #3; Pulled Shift spec settings.");
+                                                    mUtil.writePref(mCaller, Consts.Pref_Keys.USR_SPEC_SETTINGS, mSpecTypes);
+                                                    mGetSpecSettingExpansions.onSucceed();
+                                                }
+                                                if (mUtil.readPref(mCaller, Consts.Pref_Keys.USR_SPEC_SETTINGS, Consts.Strings.NULL).equals(mSpecTypes)) {
+                                                    mGetSpecSettingExpansions.onSucceed();
+                                                    Log.i(TAG, "onDataChange: Didn't pull info #3.");
+                                                }
+                                                setGate(Consts.Fc_Keys.SPEC_SETTINGS_TYPES_PULLED, true);
+                                                return;
+                                            }
+                                        Log.i(TAG, "onDataChange: Didn't pull #3.");
+                                    }
+
+                                    @Override
+                                    public void onCancelled(DatabaseError databaseError) {
+                                        Log.e(TAG, "onCancelled: Failed data pull #3", databaseError.toException());
+                                        mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
+                                        mGetSpecSettingExpansions.onFail();
+                                    }
+                                });
+                            }
+                        };
+                        final TaskResult mGetSpecSettingsSet = new TaskResult() {
+                            @Override
+                            public void onFail() {
+                                Linker.this.onFailedBackgroundDataPull();
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode()).addListenerForSingleValueEvent(new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(DataSnapshot dataSnapshot) {
+                                        for (DataSnapshot mSnap : dataSnapshot.getChildren()) {
+                                            if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_SET)) {
+                                                SpecSettings mSettings = (SpecSettings) mUtil.readPref(mCaller, Consts.Pref_Keys.USR_SPEC_SETTINGS_OBJECT, SpecSettings.getEmpty());
+                                                SpecSettings mPulledSettings;
+                                                try {
+                                                    mPulledSettings = SpecSettings.fromString(mSnap.getValue().toString());
+                                                } catch (JSONException e) {
+                                                    e.printStackTrace();
                                                     return;
                                                 }
+                                                if (mSettings.equals(SpecSettings.getEmpty()) || !mPulledSettings.equals(mSettings)) {
+                                                    mUtil.writePref(mCaller, Consts.Pref_Keys.USR_SPEC_SETTINGS_OBJECT, mPulledSettings);
+                                                    Log.i(TAG, "onDataChange: Added Info #2; Pulled spec settings object.");
+                                                    setGate(Consts.Fc_Keys.SPEC_SETTINGS_SET_PULLED, true);
+                                                    mGetSpecSettings.onSucceed();
+                                                    return;
+                                                }
+                                                setGate(Consts.Fc_Keys.SPEC_SETTINGS_SET_PULLED, true);
+                                                Log.i(TAG, "onDataChange: Didn't pull #2.");
                                             }
                                         }
+                                        mGetSpecSettings.onSucceed();
                                     }
-                                } catch (Exception e) {
-                                    Log.e(TAG, "onReceive: failed", e);
-                                    mResult.onFail();
-                                }
-                            }
-                        }
-                    };
-                    mCaller.registerReceiver(mSmsReceieved, new IntentFilter(action));
-                    SmsManager smsMgr = SmsManager.getDefault();
-                    smsMgr.sendTextMessage(toNumber, null, Integer.toString(verCode), null, null);
-                } else
-                    throw new InsufficientParametersException();
-                break;
-            //=====================================================================
-            case Consts.Linker_Keys.TYPE_UPLOAD_SPEC_SETTINGS:
-                containsAllRequiredParams = mParams.containsKey(Consts.Linker_Keys.KEY_SPEC_SETTINGS);
-                if (containsAllRequiredParams)
-                    FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC)
-                            .child(FirebaseUtil.getUser().getCode()).child(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_SET)
-                            .setValue((mParams.get(Consts.Linker_Keys.KEY_SPEC_SETTINGS)).toString());
-                else
-                    throw new InsufficientParametersException();
-                break;
-            //=====================================================================
-            case Consts.Linker_Keys.TYPE_DELETE_ACCOUNT:
-                containsAllRequiredParams = mParams.containsKey(Consts.Linker_Keys.KEY_DELETE_USER_BASEUSER_OBJECT);
-                if (containsAllRequiredParams) {
-                    final BaseUser mUser = (BaseUser) mParams.get(Consts.Linker_Keys.KEY_DELETE_USER_BASEUSER_OBJECT);
-                    final FinishableTaskWithParams mTask = new FinishableTaskWithParams() {
-                        @Override
-                        public void onFinish() {
-                            String mAccepted = (String) getParams().get(Consts.Param_Keys.KEY_ACCEPTED_USERS_STRING);
-                            String newUsers = "";
-                            String[] mParts = mAccepted.split(mUser.getUID());
-                            boolean rightIsEmpty = mParts[1].length() > 1;
-                            boolean leftIsEmpty = mParts[0].length() > 1;
-                            if (rightIsEmpty && leftIsEmpty)
-                                newUsers = "";
-                            else if (rightIsEmpty)
-                                newUsers += mParts[1];
-                            else if (leftIsEmpty)
-                                newUsers += mParts[0];
-                            else
-                                newUsers += mParts[0] + mParts[1].substring(1);
-                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getUID()).child(Consts.Fb_Keys.MGR_SEC_USERS_ACCEPTED).setValue(newUsers);
-                            erase();
-                        }
-                    };
-                    FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC_USER_REQUESTS).child(mUser.getUID()).setValue(Consts.Strings.VALUE_DELETE_ACCOUNT);
-                    FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getUID()).addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(DataSnapshot dataSnapshot) {
-                            for (DataSnapshot mSnap : dataSnapshot.getChildren()) {
-                                if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_USERS_ACCEPTED)) {
-                                    String mAccepted = mSnap.getValue().toString();
-                                    mTask.addParam(Consts.Param_Keys.KEY_ACCEPTED_USERS_STRING, mAccepted);
-                                    mTask.onFinish();
-                                    return;
-                                }
-                            }
-                            Log.i(TAG, "onDataChange: Didn't find account to delete.");
-                        }
 
-                        @Override
-                        public void onCancelled(DatabaseError databaseError) {
-                            Log.e(TAG, "onCancelled: deleting account failed", databaseError.toException());
+                                    @Override
+                                    public void onCancelled(DatabaseError databaseError) {
+                                        Log.i(TAG, "onCancelled: Failed data pull # 2");
+                                        mGetSpecSettings.onFail();
+                                    }
+                                });
+                            }
+                        };
+                        final FinishableTask mGetShifts = new FinishableTask() {
+
+
+                            @Override
+                            public void onFinish() {
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode())
+                                        .addListenerForSingleValueEvent(new ValueEventListener() {
+                                            @Override
+                                            public void onDataChange(final DataSnapshot dataSnapshot) {
+                                                FinishableTask mTask = new FinishableTask() {
+                                                    @Override
+                                                    public void onFinish() {
+                                                        for (DataSnapshot mSnap : dataSnapshot.getChildren())
+                                                            if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_SHIFT_SCHEDULE)) {
+                                                                String shifts = mSnap.getValue().toString();
+                                                                String presShifts = (String) mUtil.readPref(mCaller, Consts.Pref_Keys.USR_SHIFT_SCHEDULE, Consts.Strings.NULL);
+                                                                Log.i(TAG, "onDataChange: Added Info #1; Pulled shift schedule.");
+                                                                if (presShifts.equals(Consts.Strings.NULL) || !presShifts.equals(shifts)) {
+                                                                    mUtil.writePref(mCaller, Consts.Pref_Keys.USR_SHIFT_SCHEDULE, shifts);
+                                                                    mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
+                                                                } else
+                                                                    Log.i(TAG, "onDataChange: Didn't pull #1.");
+                                                                mGetSpecSettingsSet.onSucceed();
+                                                                setGate(Consts.Fc_Keys.SHIFT_SCHEDULE_SETTINGS_PULLED, true);
+                                                                return;
+                                                            }
+                                                        setGate(Consts.Fc_Keys.SHIFT_SCHEDULE_SETTINGS_PULLED, false);
+                                                        mGetSpecSettingsSet.onSucceed();
+                                                    }
+                                                };
+                                                if (!getIsGateOpen(Consts.Fc_Keys.LOGIN_OR_REGISTER_FINISHED)) {
+                                                    addGateOpenListener(Consts.Fc_Keys.LOGIN_OR_REGISTER_FINISHED, mTask);
+                                                } else {
+                                                    mTask.onFinish();
+                                                }
+                                            }
+
+                                            @Override
+                                            public void onCancelled(DatabaseError databaseError) {
+                                                Log.e(TAG, "onCancelled: Failed data pull #1", databaseError.toException());
+                                                mGetSpecSettingExpansions.onFail();
+                                            }
+                                        });
+                            }
+                        };
+                        mGetShifts.onFinish();
+                    } else
+                        throw new InsufficientParametersException();
+                    break;
+                //=====================================================================
+                case Consts.Linker_Keys.TYPE_GET_PHONE_NUMBER:
+                    containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_NUMBER_FETCHER_DIALOG) &&
+                            mParams.containsKey(Consts.Linker_Keys.KEY_NUMBER_FETCHER_DIALOG_VER) &&
+                            mParams.containsKey(Consts.Linker_Keys.KEY_NUMBER_FETCHER_TO));
+                    if (containsAllRequiredParams) {
+                        final int verCode = new Random().nextInt(100000000);
+                        final String action = "android.provider.Telephony.SMS_RECEIVED";
+
+                        final ProgressDialog mDialog = (ProgressDialog) mParams.get(Consts.Linker_Keys.KEY_NUMBER_FETCHER_DIALOG);
+                        final AlertDialog mVerDialog = (AlertDialog) mParams.get(Consts.Linker_Keys.KEY_NUMBER_FETCHER_DIALOG_VER);
+
+                        String toNumber = mParams.get(Consts.Linker_Keys.KEY_NUMBER_FETCHER_TO).toString();
+                        final String finalToNumber = toNumber;
+                        final TaskResult mResult = new TaskResult() {
+                            @Override
+                            public void onFail() {
+                                mDialog.dismiss();
+                                mCaller.runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Toast.makeText(mCaller, R.string.phone_num_dialog_err_not_correct_number, Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                                erase();
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                mDialog.dismiss();
+                                mVerDialog.dismiss();
+                                mUtil.writePref(mCaller, Consts.Pref_Keys.USR_NUMBER, finalToNumber);
+                                if (mTaskOnFinish != null) {
+                                    mTaskOnFinish.onFinish();
+                                    mTaskOnFinish = null;
+                                }
+                                erase();
+                            }
+                        };
+                        BroadcastReceiver mSmsReceieved = new BroadcastReceiver() {
+                            @Override
+                            public void onReceive(Context context, Intent intent) {
+                                if (intent.getAction().equals(action)) {
+                                    try {
+                                        Bundle extras = intent.getExtras();
+                                        SmsMessage[] msgs;
+                                        String smsFrom;
+                                        if (extras != null) {
+                                            Object[] pdus = (Object[]) extras.get("pdus");
+                                            if (pdus != null) {
+                                                msgs = new SmsMessage[pdus.length];
+                                                for (int i = 0; i < msgs.length; i++) {
+                                                    msgs[i] = SmsMessage.createFromPdu((byte[]) pdus[i]);
+                                                    smsFrom = msgs[i].getOriginatingAddress();
+                                                    if (smsFrom.startsWith("+972"))
+                                                        smsFrom = smsFrom.replace("+972", "0");
+                                                    else
+                                                        throw new RuntimeException("Unknown country code.");
+                                                    String smsBody = msgs[i].getMessageBody();
+                                                    if (smsFrom.equals(finalToNumber) && smsBody.equals(Integer.toString(verCode))) {
+                                                        mDialog.dismiss();
+                                                        context.unregisterReceiver(this);
+                                                        mResult.onSucceed();
+                                                        return;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "onReceive: failed", e);
+                                        mResult.onFail();
+                                    }
+                                }
+                            }
+                        };
+                        mCaller.registerReceiver(mSmsReceieved, new IntentFilter(action));
+                        SmsManager smsMgr = SmsManager.getDefault();
+                        smsMgr.sendTextMessage(toNumber, null, Integer.toString(verCode), null, null);
+                    } else
+                        throw new InsufficientParametersException();
+                    break;
+                //=====================================================================
+                case Consts.Linker_Keys.TYPE_UPLOAD_SPEC_SETTINGS:
+                    containsAllRequiredParams = mParams.containsKey(Consts.Linker_Keys.KEY_SPEC_SETTINGS);
+                    if (containsAllRequiredParams)
+                        FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC)
+                                .child(FirebaseUtil.getUser().getCode()).child(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_SET)
+                                .setValue((mParams.get(Consts.Linker_Keys.KEY_SPEC_SETTINGS)).toString());
+                    else
+                        throw new InsufficientParametersException();
+                    break;
+                //=====================================================================
+                case Consts.Linker_Keys.TYPE_DELETE_ACCOUNT:
+                    containsAllRequiredParams = mParams.containsKey(Consts.Linker_Keys.KEY_DELETE_USER_BASEUSER_OBJECT);
+                    if (containsAllRequiredParams) {
+                        final BaseUser mUser = (BaseUser) mParams.get(Consts.Linker_Keys.KEY_DELETE_USER_BASEUSER_OBJECT);
+                        final FinishableTaskWithParams mTask = new FinishableTaskWithParams() {
+                            @Override
+                            public void onFinish() {
+                                String mAccepted = (String) getParams().get(Consts.Param_Keys.KEY_ACCEPTED_USERS_STRING);
+                                String newUsers = "";
+                                String[] mParts = mAccepted.split(mUser.getUID());
+                                boolean rightIsEmpty = mParts[1].length() > 1;
+                                boolean leftIsEmpty = mParts[0].length() > 1;
+                                if (rightIsEmpty && leftIsEmpty)
+                                    newUsers = "";
+                                else if (rightIsEmpty)
+                                    newUsers += mParts[1];
+                                else if (leftIsEmpty)
+                                    newUsers += mParts[0];
+                                else
+                                    newUsers += mParts[0] + mParts[1].substring(1);
+                                FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getUID()).child(Consts.Fb_Keys.MGR_SEC_USERS_ACCEPTED).setValue(newUsers);
+                                if (mTaskOnFinish != null) {
+                                    mTaskOnFinish.onFinish();
+                                    mTaskOnFinish = null;
+                                }
+                                erase();
+                            }
+                        };
+                        FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC_USER_REQUESTS).child(mUser.getUID()).setValue(Consts.Strings.VALUE_DELETE_ACCOUNT);
+                        FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getUID()).addListenerForSingleValueEvent(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(DataSnapshot dataSnapshot) {
+                                for (DataSnapshot mSnap : dataSnapshot.getChildren()) {
+                                    if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_USERS_ACCEPTED)) {
+                                        String mAccepted = mSnap.getValue().toString();
+                                        mTask.addParam(Consts.Param_Keys.KEY_ACCEPTED_USERS_STRING, mAccepted);
+                                        mTask.onFinish();
+                                        return;
+                                    }
+                                }
+                                Log.i(TAG, "onDataChange: Didn't find account to delete.");
+                            }
+
+                            @Override
+                            public void onCancelled(DatabaseError databaseError) {
+                                Log.e(TAG, "onCancelled: deleting account failed", databaseError.toException());
+                            }
+                        });
+                    } else
+                        throw new InsufficientParametersException();
+                    break;
+                //=====================================================================
+                case Consts.Linker_Keys.TYPE_UPDATE_USER_ACCOUNTS:
+                    containsAllRequiredParams = mParams.containsKey(Consts.Linker_Keys.KEY_USER_UPDATE_LIST);
+                    if (containsAllRequiredParams) {
+                        @SuppressWarnings("unchecked")
+                        ArrayList<BaseUser> mUsers = (ArrayList<BaseUser>) mParams.get(Consts.Linker_Keys.KEY_USER_UPDATE_LIST);
+                        for (BaseUser user : mUsers)
+                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.USERS).child(user.getUID()).child(Consts.Fb_Keys.USER_BASE_USER_OBJECT).setValue(user);
+                        if (mTaskOnFinish != null) {
+                            mTaskOnFinish.onFinish();
+                            mTaskOnFinish = null;
                         }
-                    });
-                } else
-                    throw new InsufficientParametersException();
-                break;
-            //=====================================================================
-            case Consts.Linker_Keys.TYPE_UPDATE_USER_ACCOUNTS:
-                containsAllRequiredParams = mParams.containsKey(Consts.Linker_Keys.KEY_USER_UPDATE_LIST);
-                if (containsAllRequiredParams) {
-                    @SuppressWarnings("unchecked")
-                    ArrayList<BaseUser> mUsers = (ArrayList<BaseUser>) mParams.get(Consts.Linker_Keys.KEY_USER_UPDATE_LIST);
-                    for (BaseUser user : mUsers)
-                        FirebaseUtil.getDatabase(Consts.Fb_Dirs.USERS).child(user.getUID()).child(Consts.Fb_Keys.USER_BASE_USER_OBJECT).setValue(user);
-                    erase();
-                } else
-                    throw new InsufficientParametersException();
-                break;
-            //=====================================================================
-            default:
-                throw new RuntimeException("Tried to execute linker with a non-recognizable type-int");
+                        erase();
+                    } else
+                        throw new InsufficientParametersException();
+                    break;
+                //=====================================================================
+                case Consts.Linker_Keys.TYPE_UPLOAD_SELECTED_SHIFTS_USER:
+                    containsAllRequiredParams = mParams.containsKey(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT);
+                    if (containsAllRequiredParams) {
+                        Shift mShift = (Shift) mParams.get(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT);
+                        JSONObject masterJSON = new JSONObject();
+                        ShiftInfo[] info = mShift.getInfoComplete();
+                        Comment[] comments = mShift.getComments();
+                        try {
+                            for (int i = 0; i < info.length; i++) {
+                                JSONArray shiftRqsArr = new JSONArray();
+                                for (int j = 0; j < 4; j++) {
+                                    boolean requested = info[i].getForBool(j);
+                                    JSONObject requestedAndValue = new JSONObject();
+                                    if (requested)
+                                        requestedAndValue.put(Consts.Strings.VALUE_SHIFT_JSON_KEY, mUtil.getShiftTitle(mCaller, j));
+                                    String comment = comments[i].getComment(j);
+                                    boolean hasComment = comment != null && !comment.isEmpty();
+                                    if (hasComment)
+                                        requestedAndValue.put(Consts.Strings.VALUE_COMMENT_JSON_KEY, comment);
+                                    if (requested)
+                                        shiftRqsArr.put(requestedAndValue);
+                                }
+                                masterJSON.put(mUtil.getDayString(mCaller, i + 1), shiftRqsArr);
+                            }
+                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.SHIFT_SUBMISSIONS).child(FirebaseUtil.getUser().getCode()).child(FirebaseUtil.getUser().getUID()).setValue(masterJSON.toString());
+                            if (mTaskOnFinish != null) {
+                                mTaskOnFinish.onFinish();
+                                mTaskOnFinish = null;
+                            }
+                            erase();
+                        } catch (JSONException ex) {
+                            ex.printStackTrace();
+                        }
+                    } else
+                        throw new InsufficientParametersException();
+                    break;
+                //=====================================================================
+                default:
+                    throw new RuntimeException("Tried to execute linker with a non-recognizable type-int");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            erase();
         }
     }
 
@@ -1072,12 +1153,17 @@ public class Linker {
      * @param key
      *         - The key of the parameter, must be of type {@link alon.com.shifter.base_classes.Consts.Linker_Keys}
      * @param param
+     *         - The parameter
      *
-     * @return
+     * @return - The {@link Linker}
      */
     public Linker addParam(String key, Object param) {
         mParams.put(key, param);
         return this;
+    }
+
+    public void setOnFinish(FinishableTask task) {
+        mTaskOnFinish = task;
     }
 
 

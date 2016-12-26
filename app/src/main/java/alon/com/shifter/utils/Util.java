@@ -20,6 +20,8 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONException;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -39,6 +41,7 @@ import alon.com.shifter.base_classes.Consts;
 import alon.com.shifter.base_classes.FinishableTask;
 import alon.com.shifter.base_classes.Linker;
 import alon.com.shifter.base_classes.TaskResult;
+import alon.com.shifter.shift_utils.SpecSettings;
 
 import static alon.com.shifter.utils.FlowController.addGateOpenListener;
 
@@ -147,6 +150,13 @@ public final class Util implements Consts {
             mPrefVal = mPrefs.getInt(key, (Integer) defaultReturnVal);
         else if (defaultReturnVal instanceof HashSet)
             mPrefVal = mPrefs.getStringSet(key, (Set<String>) defaultReturnVal);
+        else if (defaultReturnVal instanceof SpecSettings) {
+            try {
+                mPrefVal = SpecSettings.fromString(mPrefs.getString(key, Strings.NULL));
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
         return mPrefVal;
     }
 
@@ -177,6 +187,10 @@ public final class Util implements Consts {
                 mEditor.putStringSet(key, new HashSet<>((ArrayList<String>) data[next]));
             else if (data[next] instanceof HashSet)
                 mEditor.putStringSet(key, (Set<String>) data[next]);
+            else if (data[next] instanceof SpecSettings)
+                mEditor.putString(key, data[next].toString());
+            else
+                throw new RuntimeException("Type not recognized.");
         }
         mEditor.apply();
     }

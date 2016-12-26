@@ -3,6 +3,7 @@ package alon.com.shifter.views;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
+import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.ToggleButton;
@@ -45,7 +46,6 @@ public class ShiftLineView extends LinearLayout {
             for (int i = 0; i < BTN_IDS.length; i++) {
                 mShifts[i] = (ToggleButton) findViewById(BTN_IDS[i]);
                 mShifts[i].setTag(i + "-" + hashCode());
-                System.out.println(i + "-" + hashCode());
             }
         } finally {
             arr.recycle();
@@ -59,7 +59,11 @@ public class ShiftLineView extends LinearLayout {
         return result;
     }
 
-    public void setShift(int shift, String comment) {
+    public String getShiftCommnent(int shift) {
+        return mShiftComments[shift];
+    }
+
+    public void setShiftComment(int shift, String comment) {
         mShiftComments[shift] = comment;
     }
 
@@ -73,5 +77,9 @@ public class ShiftLineView extends LinearLayout {
 
     public void setLongClickListener(int i, OnLongClickListener listener) {
         mShifts[i].setOnLongClickListener(listener);
+    }
+
+    public void setOnCheckedChangeListener(int i, CompoundButton.OnCheckedChangeListener listener) {
+        mShifts[i].setOnCheckedChangeListener(listener);
     }
 }

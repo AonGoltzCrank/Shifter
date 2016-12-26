@@ -14,8 +14,11 @@ public class Comment implements Serializable {
         return mComments;
     }
 
-    public void setComments(String[] mComments) {
-        this.mComments = mComments;
+    public void setComment(int index, String comment) {
+        mComments[index] = comment;
     }
 
+    public String getComment(int index) {
+        return mComments[index];
+    }
 }

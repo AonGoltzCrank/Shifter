@@ -1,7 +1,6 @@
 package alon.com.shifter.activities;
 
-import android.app.AlertDialog;
-import android.app.ProgressDialog;
+import android.app.DialogFragment;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.Editable;
@@ -20,6 +19,7 @@ import alon.com.shifter.base_classes.BaseActivity;
 import alon.com.shifter.base_classes.DelayedTaskExecutor;
 import alon.com.shifter.base_classes.FinishableTask;
 import alon.com.shifter.base_classes.Linker;
+import alon.com.shifter.dialog_fragments.ProgressDialogFragment;
 import alon.com.shifter.utils.FirebaseUtil;
 
 import static alon.com.shifter.utils.FlowController.addGateOpenListener;
@@ -38,7 +38,7 @@ public class Activity_Login extends BaseActivity {
 
     private boolean passTooWeak = false;
 
-    private AlertDialog mLoginDialog;
+    private ProgressDialogFragment mLoginDialog;
 
     private CheckBox mPermaLogin;
 
@@ -61,27 +61,39 @@ public class Activity_Login extends BaseActivity {
         addGateOpenListener(Fc_Keys.LOGIN_FAILED, mTask);
 
         if ((boolean) mUtil.readPref(this, Pref_Keys.LOG_PERMA_LOGIN, false)) {
-            try {
-                mLoginDialog = new ProgressDialog(Activity_Login.this);
-                mLoginDialog.setTitle(getString(R.string.logging_in));
-                mLoginDialog.setMessage(getString(R.string.please_wait));
-                mLoginDialog.setCancelable(false);
-                mLoginDialog.show();
-                Linker linker = Linker.getLinker(this, Linker_Keys.TYPE_LOGIN);
-                linker.addParam(Linker_Keys.KEY_LOGIN_DIALOG, mLoginDialog);
-                linker.addParam(Linker_Keys.KEY_LOGIN_EMAIL, mUtil.readPref(this, Pref_Keys.LOG_PERMA_LOGIN_EMAIL, Strings.NULL));
-                linker.addParam(Linker_Keys.KEY_LOGIN_PASS, mUtil.readPref(this, Pref_Keys.LOG_PERMA_LOGIN_PASS, Strings.NULL));
-                linker.execute();
-            } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e) {
-                e.printStackTrace();
-            } catch (Exception e) {
-                e.printStackTrace();
-                mUtil.writePref(this, Pref_Keys.LOG_PERMA_LOGIN, false);
-                mUtil.writePref(this, Pref_Keys.LOG_PERMA_LOGIN_EMAIL, Strings.NULL);
-                mUtil.writePref(this, Pref_Keys.LOG_PERMA_LOGIN_PASS, Strings.NULL);
-            }
+            generateDialog();
+            new AsyncTask<Void, Void, Void>() {
+
+                @Override
+                protected Void doInBackground(Void... params) {
+                    try {
+                        Linker linker = Linker.getLinker(Activity_Login.this, Linker_Keys.TYPE_LOGIN);
+                        linker.addParam(Linker_Keys.KEY_LOGIN_DIALOG, mLoginDialog);
+                        linker.addParam(Linker_Keys.KEY_LOGIN_EMAIL, mUtil.readPref(Activity_Login.this, Pref_Keys.LOG_PERMA_LOGIN_EMAIL, Strings.NULL));
+                        linker.addParam(Linker_Keys.KEY_LOGIN_PASS, mUtil.readPref(Activity_Login.this, Pref_Keys.LOG_PERMA_LOGIN_PASS, Strings.NULL));
+                        linker.execute();
+                    } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e) {
+                        e.printStackTrace();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        mUtil.writePref(Activity_Login.this, Pref_Keys.LOG_PERMA_LOGIN, false);
+                        mUtil.writePref(Activity_Login.this, Pref_Keys.LOG_PERMA_LOGIN_EMAIL, Strings.NULL);
+                        mUtil.writePref(Activity_Login.this, Pref_Keys.LOG_PERMA_LOGIN_PASS, Strings.NULL);
+                    }
+                    return null;
+                }
+            }.execute();
         } else
             init();
+    }
+
+    private void generateDialog() {
+        mLoginDialog = new ProgressDialogFragment();
+        mLoginDialog.setTitle(getString(R.string.logging_in));
+        mLoginDialog.setMessage(getString(R.string.please_wait));
+        mLoginDialog.setCancelable(false);
+        mLoginDialog.setStyle(DialogFragment.STYLE_NO_TITLE, 0);
+        mLoginDialog.show(getFragmentManager(), DialogFragment_Keys.CONNECTION_KEY);
     }
 
     private void init() {
@@ -93,7 +105,7 @@ public class Activity_Login extends BaseActivity {
 
     @Override
     protected void setupUI() {
-        final TextView mExistingAccTV, mPermaLoginTV;
+        TextView mExistingAccTV, mPermaLoginTV;
 
         mExistingAcc = (CheckBox) findViewById(R.id.LOG_existing_acc);
         mExistingAccTV = (TextView) findViewById(R.id.LOG_existing_acc_tv);
@@ -203,7 +215,7 @@ public class Activity_Login extends BaseActivity {
             if (mPrimaryPass.getText().toString().isEmpty())
                 incompViews[count++] = mPrimaryPass;
             if (count == 0) {
-                new DialogController()
+                new RegistrationTask()
                         .execute(mWorkplaceCode.getText().toString(),
                                 mName.getText().toString(), mEmail.getText().toString(),
                                 mPrimaryPass.getText().toString(), mExistingAcc.isChecked(), mPermaLogin.isChecked());
@@ -214,37 +226,17 @@ public class Activity_Login extends BaseActivity {
         }
     }
 
-    private class DialogController extends AsyncTask<Object, Integer, Void> {
+    private class RegistrationTask extends AsyncTask<Object, Void, Void> {
 
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            mLoginDialog = new ProgressDialog(Activity_Login.this);
-            mLoginDialog.setTitle(getString(R.string.logging_in));
-            mLoginDialog.setMessage(getString(R.string.please_wait));
-            mLoginDialog.show();
-
-        }
-
-
-        @Override
-        protected void onProgressUpdate(Integer... values) {
-            int code = values[0];
-            if (code == Ints.PGS_STARTED_WRKPLC_CHECK)
-                mLoginDialog.setMessage(getString(R.string.register_dialog_checking_workplace_code));
-            else if (code == Ints.PGS_STARTED_EMAIL_CHECK)
-                mLoginDialog.setMessage(getString(R.string.register_dialog_checking_email));
-            else if (code == Ints.PGS_STARTED_EMAIL_VERIFICATION)
-                mLoginDialog.setMessage(getString(R.string.register_dialog_verifing_email));
-            else if (code == Ints.PGS_STARTED_EMAIL_ENCRYPTION)
-                mLoginDialog.setMessage(getString(R.string.register_dialog_encrypting_email));
-            else if (code == Ints.PGS_STARTED_ADDING_USER)
-                mLoginDialog.setMessage(getString(R.string.register_dialog_adding_you));
+            generateDialog();
         }
 
         @Override
         @SuppressWarnings("unchecked")
-        protected Void doInBackground(final Object... params) {
+        protected Void doInBackground(Object... params) {
             String workPlaceCode = params[0].toString();
             String name = params[1].toString();
             String email = params[2].toString();
@@ -252,7 +244,7 @@ public class Activity_Login extends BaseActivity {
             boolean exists = (boolean) params[4];
             boolean perma = (boolean) params[5];
 
-            Linker linker = null;
+            Linker linker;
             try {
                 if (exists)
                     linker = Linker.getLinker(Activity_Login.this, Linker_Keys.TYPE_LOGIN);

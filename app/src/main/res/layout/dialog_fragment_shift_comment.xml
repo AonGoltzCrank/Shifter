@@ -5,6 +5,8 @@
               android:orientation="vertical"
               android:padding="10dp">
 
+    <include layout="@layout/text_dialog_title"/>
+
     <EditText
         android:id="@+id/DF_SC_comment"
         android:layout_width="match_parent"

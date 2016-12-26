@@ -60,7 +60,7 @@ public class EncryptUtil {
         Byte[] iv = new Byte[IV.length];
         for (int i = 0; i < IV.length; i++) {
             Byte b = IV[i];
-            iv[i] = b.byteValue();
+            iv[i] = b;
         }
         return iv;
     }
