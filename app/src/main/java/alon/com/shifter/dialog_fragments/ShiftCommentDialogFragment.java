@@ -53,7 +53,7 @@ public class ShiftCommentDialogFragment extends DialogFragment {
         mSubmit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mTaskParam.addParam(Consts.Param_Keys.KEY_SHIFT_COMMENT, mMsg.getText().toString());
+                mTaskParam.addParamToTask(Consts.Param_Keys.KEY_SHIFT_COMMENT, mMsg.getText().toString());
                 mTaskParam.onFinish();
                 dismiss();
             }

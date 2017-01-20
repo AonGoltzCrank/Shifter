@@ -1,24 +1,27 @@
 package alon.com.shifter.activities;
 
-import android.app.AlertDialog;
-import android.app.ProgressDialog;
-import android.content.DialogInterface;
-import android.os.AsyncTask;
+import android.app.DialogFragment;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
-import android.widget.TextView;
 
 import alon.com.shifter.R;
 import alon.com.shifter.base_classes.BaseActivity;
 import alon.com.shifter.base_classes.FinishableTask;
 import alon.com.shifter.base_classes.Linker;
+import alon.com.shifter.dialog_fragments.ProgressDialogFragment;
+import alon.com.shifter.dialog_fragments.TwoButtonDialogFragment;
 import alon.com.shifter.shift_utils.Shift;
 import alon.com.shifter.views.ShiftSubmissionView;
+import alon.com.shifter.wrappers.AsyncWrapper;
+import alon.com.shifter.wrappers.FinishableTaskWrapper;
+import alon.com.shifter.wrappers.OnClickWrapper;
 
 import static alon.com.shifter.utils.FlowController.addGateOpenListener;
 import static alon.com.shifter.utils.FlowController.getIsGateOpen;
+import static alon.com.shifter.wrappers.WrapperBase.DIALOG_FRAGMENT_ID;
+import static alon.com.shifter.wrappers.WrapperBase.FINISHABLE_TASK_ID;
+import static alon.com.shifter.wrappers.WrapperBase.SHIFT_ID;
 
 public class Activity_Select_Shifts_For_Week extends BaseActivity {
 
@@ -32,24 +35,27 @@ public class Activity_Select_Shifts_For_Week extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        overridePendingTransition(R.anim.act_transition_in, R.anim.act_transition_out);
-        setContentView(R.layout.activity_first_shift_setup);
 
-        TAG = "Shifter_FirstShiftSelection";
-        getUtil(this);
-
-        if (getIntent().getExtras() != null) {
+        if (getIntent() != null && getIntent().getExtras() != null) {
             mShift = (Shift) getIntent().getExtras().getSerializable(Strings.FILE_SHIFT_OBJECT);
             mChangeText = getIntent().getExtras().getBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON);
+
         }
-        if (mShifts == null)
+
+        setContentView(R.layout.activity_first_shift_setup);
+
+        TAG = "Shifter_ShiftSelectionMgr";
+
+        getUtil(this);
+
+        if (mShift == null)
             mShift = (Shift) mUtil.readObject(this, Strings.FILE_SHIFT_OBJECT);
 
         boolean allGatesOpen = getIsGateOpen(Fc_Keys.SPEC_SETTINGS_TYPES_PULLED) && getIsGateOpen(Fc_Keys.SPEC_SETTING_RESTS_PULLED) && getIsGateOpen(Fc_Keys.SPEC_SETTINGS_EXPANDABLE_INFO_PULLED);
         if (allGatesOpen)
             setupUI();
         else {
-            final ProgressDialog mDialog = mUtil.generateStandbyDialog(this);
+            final ProgressDialogFragment mDialog = mUtil.generateStandbyDialog(this);
             FinishableTask mTask = new FinishableTask() {
                 int gateOpenCount = 0;
 
@@ -70,55 +76,60 @@ public class Activity_Select_Shifts_For_Week extends BaseActivity {
 
     @Override
     protected void setupUI() {
-        final FinishableTask mAcceptedShiftSetting = new FinishableTask() {
+        FinishableTask mAcceptedShiftSetting = new FinishableTask() {
             @Override
             public void onFinish() {
-                AlertDialog mDialog;
-                AlertDialog.Builder mBuilder = new AlertDialog.Builder(Activity_Select_Shifts_For_Week.this);
-                mBuilder.setTitle(R.string.dialog_uploading_data)
-                        .setMessage(getString(R.string.mgr_uploading_data_add_spec_settings))
-                        .setCancelable(false)
-                        .setPositiveButton(getString(R.string.title_special_settings), new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                mUtil.writePref(Activity_Select_Shifts_For_Week.this, Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
-                                Bundle mExtras = new Bundle();
-                                mExtras.putBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON, false);
-                                mUtil.changeScreen(Activity_Select_Shifts_For_Week.this, Activity_Special_Settings.class, mExtras);
-                                Activity_Select_Shifts_For_Week.this.finish();
-                            }
-                        });
-                mBuilder.setNegativeButton(getString(R.string.title_shift_hours), new DialogInterface.OnClickListener() { //Indentation is messed up for some reason.
+                TwoButtonDialogFragment frag = new TwoButtonDialogFragment();
+                frag.setTitle(getString(R.string.dialog_uploading_data));
+                frag.setMessage(getString(R.string.mgr_uploading_data_add_spec_settings));
+                frag.setButtonLeft(getString(R.string.title_special_settings));
+                frag.setButtonRight(getString(R.string.title_shift_hours));
+                OnClickWrapper wrapperLeft = new OnClickWrapper() {
                     @Override
-                    public void onClick(DialogInterface dialog, int which) {
+                    public void onClick(View v) {
+                        mUtil.writePref(Activity_Select_Shifts_For_Week.this, Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
+                        Bundle mExtras = new Bundle();
+                        mExtras.putBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON, false);
+                        mUtil.changeScreen(Activity_Select_Shifts_For_Week.this, Activity_Special_Settings.class, mExtras);
+                        Activity_Select_Shifts_For_Week.this.finish();
+                        ((DialogFragment) getWrapperParam(DIALOG_FRAGMENT_ID)).dismiss();
+                    }
+                };
+                OnClickWrapper wrapperRight = new OnClickWrapper() {
+                    @Override
+                    public void onClick(View v) {
                         mUtil.writePref(Activity_Select_Shifts_For_Week.this, Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
                         Bundle mExtras = new Bundle();
                         mExtras.putBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON, false);
                         mUtil.changeScreen(Activity_Select_Shifts_For_Week.this, Activity_Shift_Hour_Setting.class, mExtras);
                         Activity_Select_Shifts_For_Week.this.finish();
+                        ((DialogFragment) getWrapperParam(DIALOG_FRAGMENT_ID)).dismiss();
                     }
-                });
-                mDialog = mBuilder.create();
-                mDialog.show();
-                ((TextView) mDialog.findViewById(android.R.id.title)).setGravity(Gravity.RIGHT);
+                };
 
-                new AsyncTaskWrapper(mDialog, mShifts.getSelectedShifts()) {
+                wrapperRight.setWrapperParam(DIALOG_FRAGMENT_ID, frag);
+                wrapperLeft.setWrapperParam(DIALOG_FRAGMENT_ID, frag);
+
+                frag.setLeftListener(wrapperLeft);
+                frag.setRightListener(wrapperRight);
+                frag.setStyle(DialogFragment.STYLE_NO_TITLE, 0);
+                frag.show(getFragmentManager(), DialogFragment_Keys.TWO_BUTTON_DIALOG);
+                AsyncWrapper wrapper = new AsyncWrapper() {
                     @Override
                     protected Void doInBackground(Void... params) {
                         try {
-
                             Linker linker = Linker.getLinker(Activity_Select_Shifts_For_Week.this, Linker_Keys.TYPE_UPLOAD_SHIFT_SCHEDULE);
-                            linker.addParam(Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT, mShift);
-                            linker.addParam(Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG, mDialog);
+                            linker.addParam(Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT, getWrapperParam(SHIFT_ID));
+                            linker.addParam(Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG, getWrapperParam(DIALOG_FRAGMENT_ID));
                             linker.execute();
-                        } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e)
-
-                        {
+                        } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e) {
                             e.printStackTrace();
                         }
                         return null;
                     }
-                }.execute();
+                };
+                wrapper.setWrapperParam(SHIFT_ID, mShifts.getSelectedShifts()).setWrapperParam(DIALOG_FRAGMENT_ID, frag);
+                wrapper.execute();
             }
         };
 
@@ -128,50 +139,66 @@ public class Activity_Select_Shifts_For_Week extends BaseActivity {
         Button mDone = (Button) findViewById(R.id.FSS_done);
         if (mChangeText)
             mDone.setText(getString(R.string.back));
-        mDone.setOnClickListener(new View.OnClickListener() {
+        OnClickWrapper wrapper = new OnClickWrapper() {
             @Override
             public void onClick(View v) {
-                FinishableTask mDoneSelectingShifts = new FinishableTask() {
+                FinishableTaskWrapper mDoneSelectingShifts = new FinishableTaskWrapper() {
                     @Override
                     public void onFinish() {
                         if (!mChangeText) {
-                            AlertDialog.Builder mBuilder = new AlertDialog.Builder(Activity_Select_Shifts_For_Week.this);
-                            mBuilder.setTitle(R.string.are_you_sure_eng).setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+                            TwoButtonDialogFragment frag = new TwoButtonDialogFragment();
+                            frag.setTitle(getString(R.string.are_you_sure));
+                            frag.setMessage(getString(R.string.mgr_set_shifts));
+                            frag.setButtonLeft(getString(R.string.cancel));
+                            frag.setButtonRight(getString(R.string.done));
+                            OnClickWrapper wrapperLeft = new OnClickWrapper() {
                                 @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    dialog.dismiss();
+                                public void onClick(View v) {
+                                    ((DialogFragment) getWrapperParam(DIALOG_FRAGMENT_ID)).dismiss();
                                 }
-                            }).setPositiveButton(R.string.done, new DialogInterface.OnClickListener() {
+                            };
+                            OnClickWrapper wrapperRight = new OnClickWrapper() {
                                 @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    mAcceptedShiftSetting.onFinish();
-                                    dialog.dismiss();
+                                public void onClick(View v) {
+                                    ((DialogFragment) getWrapperParam(DIALOG_FRAGMENT_ID)).dismiss();
+                                    ((FinishableTask) getWrapperParam(FINISHABLE_TASK_ID)).onFinish();
                                 }
-                            }).setCancelable(false).setMessage(R.string.mgr_set_shifts);
-                            AlertDialog mDialog = mBuilder.create();
-                            mDialog.show();
+                            };
+                            wrapperRight.setWrapperParam(DIALOG_FRAGMENT_ID, frag);
+                            wrapperLeft.setWrapperParam(DIALOG_FRAGMENT_ID, frag);
+
+                            wrapperRight.setWrapperParam(FINISHABLE_TASK_ID, getWrapperParam(FINISHABLE_TASK_ID));
+
+                            frag.setLeftListener(wrapperLeft);
+                            frag.setRightListener(wrapperRight);
+                            frag.setStyle(DialogFragment.STYLE_NO_TITLE, 0);
+                            frag.show(getFragmentManager(), DialogFragment_Keys.TWO_BUTTON_DIALOG);
                         } else
                             mUtil.changeScreen(Activity_Select_Shifts_For_Week.this, Activity_Shifter_Manager_Settings.class);
+
                     }
                 };
+                mDoneSelectingShifts.setWrapperParam(FINISHABLE_TASK_ID, getWrapperParam(FINISHABLE_TASK_ID));
+
                 if (getIsGateOpen(Fc_Keys.LOGIN_OR_REGISTER_FINISHED))
                     mDoneSelectingShifts.onFinish();
                 else {
                     addGateOpenListener(Fc_Keys.LOGIN_OR_REGISTER_FINISHED, mDoneSelectingShifts);
                 }
             }
-        });
+        };
+        wrapper.setWrapperParam(FINISHABLE_TASK_ID, mAcceptedShiftSetting);
+        mDone.setOnClickListener(wrapper);
     }
 
-    private abstract class AsyncTaskWrapper extends AsyncTask<Void, Void, Void> {
-
-        protected AlertDialog mDialog;
-        protected Shift mShift;
-
-        AsyncTaskWrapper(AlertDialog dialog, Shift shift) {
-            mDialog = dialog;
-            mShift = shift;
-        }
-    }
-
+//    private abstract class AsyncTaskWrapper extends AsyncTask<Void, Void, Void> {
+//
+//        DialogFragment mDialog;
+//        Shift mShift;
+//
+//        AsyncTaskWrapper(DialogFragment dialog, Shift shift) {
+//            mDialog = dialog;
+//            mShift = shift;
+//        }
+//    }
 }

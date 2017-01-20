@@ -56,7 +56,7 @@ public abstract class BaseActivity extends Activity implements CompoundButton.On
 
 
     /**
-     * <b>Note:</b> if not overridden, then will cause an error without any processing to checked change.
+     * <b>Note:</b> if not overridden, then will cause an error without any processing to click.
      *
      * @param v
      *         - the view that was clicked.

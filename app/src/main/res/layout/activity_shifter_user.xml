@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="match_parent"
+                android:padding="10dp">
 
     <TextView
         android:id="@+id/USR_unapproved_user"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+
         android:gravity="center"
         android:text="@string/user_unapproved"
         android:textAppearance="?android:attr/textAppearanceLarge"
@@ -18,6 +20,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
         android:layout_centerHorizontal="true"
+
         android:gravity="center"
         android:textAppearance="?android:attr/textAppearanceLarge"/>
 
@@ -29,7 +32,8 @@
         android:layout_alignParentLeft="true"
         android:layout_alignParentRight="true"
         android:layout_alignParentStart="true"
-        android:layout_below="@+id/USR_btn_container"/>
+        android:layout_below="@+id/USR_btn_container"
+        />
 
     <LinearLayout
         android:id="@+id/USR_btn_container"
@@ -43,14 +47,12 @@
 
         <Button
             android:id="@+id/USR_submit_shifts"
-            style="?android:attr/buttonBarButtonStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/submit_shifts"/>
 
 
         <LinearLayout
-            style="?android:attr/buttonBarStyle"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="horizontal"
@@ -58,7 +60,6 @@
 
             <Button
                 android:id="@+id/USR_shift_for_week"
-                style="?android:attr/buttonBarButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="0.5"
@@ -67,7 +68,6 @@
 
             <Button
                 android:id="@+id/USR_worker_phone_page"
-                style="?android:attr/buttonBarButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_weight="0.5"
@@ -75,6 +75,11 @@
 
         </LinearLayout>
 
+        <Button
+            android:id="@+id/USR_disconnect"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ui_logout"/>
     </LinearLayout>
 
 </RelativeLayout>

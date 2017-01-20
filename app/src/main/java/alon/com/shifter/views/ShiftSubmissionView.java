@@ -109,7 +109,7 @@ public class ShiftSubmissionView extends RelativeLayout implements View.OnLongCl
             mFrag.setTask(new ViewContainer_FinishableTaskWithParams(v) {
                 @Override
                 public void onFinish() {
-                    String comment = (String) getParams().get(Consts.Param_Keys.KEY_SHIFT_COMMENT);
+                    String comment = (String) getParamsFromTask().get(Consts.Param_Keys.KEY_SHIFT_COMMENT);
                     if (comment != null && !comment.isEmpty()) {
                         String tag = (String) this.view.getTag();
                         String[] partsTag = tag.split("-");
@@ -156,7 +156,7 @@ public class ShiftSubmissionView extends RelativeLayout implements View.OnLongCl
 
     public void setSpecSettings(SpecSettings settings, String specSettingsString) {
         mSpecSettings = settings;
-        if (mSpecSettings != null && !mSpecSettings.equals(SpecSettings.getEmpty())) {
+        if (mSpecSettings != null && !mSpecSettings.equals(SpecSettings.getEmpty()) && !mSpecSettings.isEmpty()) {
             String shifts = Util.getInstance(getContext()).readPref(getContext(), Consts.Pref_Keys.USR_SHIFT_SCHEDULE, Consts.Strings.NULL).toString();
             mInforcer = SpecSettingsInforcer.getInstance(mSpecSettings, specSettingsString, shifts, getContext());
         }
@@ -164,16 +164,18 @@ public class ShiftSubmissionView extends RelativeLayout implements View.OnLongCl
 
     @Override
     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-        String[] tagParts = buttonView.getTag().toString().split("-");
-        int pos = Integer.parseInt(tagParts[0]);
-        int hash = Integer.parseInt(tagParts[1]);
-        for (int i = 0; i < mViews.length; i++)
-            if (hash == mViews[i].hashCode())
-                mInforcer.onUpdatedChange(pos, i);
+        if (mInforcer != null) {
+            String[] tagParts = buttonView.getTag().toString().split("-");
+            int pos = Integer.parseInt(tagParts[0]);
+            int hash = Integer.parseInt(tagParts[1]);
+            for (int i = 0; i < mViews.length; i++)
+                if (hash == mViews[i].hashCode())
+                    mInforcer.onUpdatedChange(pos, i);
+        }
     }
 
     public boolean[] submit() {
-        return mInforcer.checkLimits();
+        return mInforcer == null ? null : mInforcer.checkLimits();
     }
 
 

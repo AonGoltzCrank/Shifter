@@ -33,15 +33,12 @@ public class SpecSettingsInforcer {
 
     private boolean[] mShiftSelection;
 
-    private Context mCon;
-
 
     private SpecSettingsInforcer(SpecSettings settings, String specSettingsString, String shiftJSON, Context context) {
         if (settings == null || settings.equals(SpecSettings.getEmpty()))
             throw new IllegalArgumentException("SpecSettings passed to constructor can't be null or empty."); // TODO add NullCheck as static function in Util class.
         mSettings = settings;
         mSpecSettingsString = specSettingsString;
-        mCon = context;
 
         mShiftSelection = new boolean[28];
         mShiftAllowed = new boolean[28];
@@ -52,7 +49,7 @@ public class SpecSettingsInforcer {
             throw new IllegalArgumentException("String passed to constructor can't be null or empty.");
 
 
-        generateAllowedShifts(shiftJSON);
+        generateAllowedShifts(shiftJSON, context);
         generateLimits();
     }
 
@@ -90,23 +87,22 @@ public class SpecSettingsInforcer {
         }
     }
 
-    private void generateAllowedShifts(String JSON) {
-        Util mUtil = Util.getInstance(mCon);
+    private void generateAllowedShifts(String JSON, Context con) {
+        Util mUtil = Util.getInstance(con);
         try {
             JSONObject mJson = new JSONObject(JSON);
             for (int i = 0; i < 7; i++) {
-                String dayName = mUtil.getDayString(mCon, i + 1);
+                String dayName = mUtil.getDayString(con, i + 1);
                 try {
                     JSONObject mObj = (JSONObject) mJson.get(dayName);
                     for (int j = 0; j < 4; j++) {
-                        String dayShiftName = mUtil.getShiftTitle(mCon, j);
+                        String dayShiftName = mUtil.getShiftTitle(con, j);
                         boolean canSubmit = !(mObj.get(dayShiftName).equals("(-1)"));
                         mShiftAllowed[i * 4 + j] = canSubmit;
                     }
                 } catch (ClassCastException ex) {
                     for (int j = 0; j < 4; j++)
                         mShiftAllowed[i * 4 + j] = false;
-
                 }
             }
         } catch (JSONException e) {

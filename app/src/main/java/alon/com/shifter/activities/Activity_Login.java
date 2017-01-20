@@ -1,10 +1,12 @@
 package alon.com.shifter.activities;
 
+import android.app.Activity;
 import android.app.DialogFragment;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
@@ -16,6 +18,7 @@ import android.widget.Toast;
 
 import alon.com.shifter.R;
 import alon.com.shifter.base_classes.BaseActivity;
+import alon.com.shifter.base_classes.Consts;
 import alon.com.shifter.base_classes.DelayedTaskExecutor;
 import alon.com.shifter.base_classes.FinishableTask;
 import alon.com.shifter.base_classes.Linker;
@@ -23,6 +26,7 @@ import alon.com.shifter.dialog_fragments.ProgressDialogFragment;
 import alon.com.shifter.utils.FirebaseUtil;
 
 import static alon.com.shifter.utils.FlowController.addGateOpenListener;
+import static alon.com.shifter.utils.FlowController.setGate;
 
 public class Activity_Login extends BaseActivity {
 
@@ -45,11 +49,40 @@ public class Activity_Login extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getUtil(this);
 
+        getUtil(this);
         TAG = "Shifter_Login";
 
-        FirebaseUtil.getFirebaseAuth().signOut();
+        if ((long) mUtil.readPref(this, Pref_Keys.LOGOUT_TIME_LONG, -1L) >= System.currentTimeMillis() || FirebaseUtil.getFirebaseAuth().getCurrentUser() == null) {
+            Log.i(TAG, "onCreate: User not logged in \\ session ended.");
+            FirebaseUtil.getFirebaseAuth().signOut();
+            mUtil.writePref(this, Pref_Keys.LOG_PERMA_LOGIN, false);
+            mUtil.writePref(this, Pref_Keys.LOG_PERMA_LOGIN_PASS, Strings.NULL);
+            mUtil.writePref(this, Pref_Keys.LOG_PERMA_LOGIN_EMAIL, Strings.NULL);
+        } else {
+            Log.i(TAG, "onCreate: User still logged in.");
+            new AsyncTask<Object, Void, Void>() {
+
+                @Override
+                protected Void doInBackground(Object... params) {
+                    try {
+                        setGate(Consts.Fc_Keys.LOGIN_OR_REGISTER_FINISHED, true);
+                        Linker linker = Linker.getLinker((Activity) params[0], Consts.Linker_Keys.TYPE_INFO_FETCHER);
+                        Log.i(TAG, "doInBackground: Started linker for background info gathering");
+                        linker.addParam(Consts.Linker_Keys.KEY_IP_FETCH_ADDR, "http://bot.whatismyipaddress.com/");
+                        linker.execute();
+                    } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e) {
+                        e.printStackTrace();
+                    }
+                    return null;
+                }
+            }.execute(this);
+            if (FirebaseUtil.getUser().isManager())
+                mUtil.changeScreen(this, Activity_Shifter_Main_Manager.class);
+            else
+                mUtil.changeScreen(this, Activity_Shifter_Main_User.class);
+            return;
+        }
 
         FinishableTask mTask = new FinishableTask() {
             @Override
@@ -97,8 +130,6 @@ public class Activity_Login extends BaseActivity {
     }
 
     private void init() {
-        overridePendingTransition(R.anim.act_transition_in, R.anim.act_transition_out);
-
         setContentView(R.layout.activity_login);
         setupUI();
     }

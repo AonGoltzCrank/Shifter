@@ -34,6 +34,8 @@ public interface Consts {
         public static final String MGR_SEC_SPEC_SETTINGS_EXPANDABLE = "spec-settings-expandable";
         public static final String MGR_SEC_SPEC_SETTINGS_RESTRICTIONS = "spec-settings-restrictions";
         public static final String MGR_SEC_USERS_ACCEPTED = "accepted-users";
+        public static final String MGR_SEC_SCHEDULE_SET = "schedule-set";
+        public static final String MGR_SEC_SPEC_SETTINGS_SET = "special-settings-object";
 
         public static final String GENERAL_INFO_JOB_TYPES = "job-types";
 
@@ -41,8 +43,6 @@ public interface Consts {
         public static final String USER_BASE_USER_OBJECT = "base-user-seralizeable";
 
         public static final String USER_SHIFT_INFO = "";
-
-        public static final String MGR_SEC_SPEC_SETTINGS_SET = "special-settings-object";
     }
 
     /**
@@ -81,6 +81,7 @@ public interface Consts {
         public static final String MGR_SEC_USER_LIST = ">>user_list<<";
 
         public static final String GENERAL_INFO_JOB_TYPES = ">>job_types<<";
+        public static final String LOGOUT_TIME_LONG = ">>logout_timestamp_milli<<";
     }
 
     /**
@@ -132,9 +133,11 @@ public interface Consts {
         public static final String KEY_ACCEPTED_USERS_STRING = "63dHskAtfQhuCblqU3Gi";
         public static final String KEY_APPROVED_STATE = "a3erXOm0ER2dNlHh2IKS";
         public static final String KEY_BASE_USER_OBJECT_LIST = "s8Qwa81RI9sD0fgTYysh";
+        public static final String KEY_BASE_USER_STRING_LIST = "jmmz3gnpCdPGHf7Op7LM";
         public static final String KEY_BASE_USER_OBJECT = "LEl32wRjgSdnwxelMNjh";
         public static final String KEY_DELETED_ACCOUNT = "l4XD1PxJ6zlNDQvOeLjQ";
         public static final String KEY_SHIFT_COMMENT = "poFKlWIDe3KADxnzqU3Q";
+        public static final String KEY_FINISHABLE_TASK = "k2Z6K1wIkAyMiRO0AyUv";
     }
 
     /**
@@ -152,6 +155,8 @@ public interface Consts {
         public static final String FILE_SHIFT_HOURS_OBJECT = "shift_hours.obj";
 
         public static final String KEY_SHOULD_CHANGE_BACK_BUTTON = "ZK9kHT5XGAgQcudZMNdC";
+        public static final String KEY_IN = "vBBzH6KqhQxWovWNqUdR";
+        public static final String KEY_OUT = "uTeESlcq5ma8xlLN6ZrE";
 
         public static final String VALUE_DELETE_ACCOUNT = "plYcwgEx6PZJ0z0o5MJyCQ4oH2uLn8fyBJ8427H8";
         public static final String VALUE_SHIFT_JSON_KEY = "json_shiftrqs_value";
@@ -205,7 +210,12 @@ public interface Consts {
 
     final class DialogFragment_Keys {
         public static final String CONNECTION_KEY = "connection_dialog_key";
-        public static final String SHIFT_SUBMISSION_ERROR = "shift_submission_error_key";
+        public static final String TWO_BUTTON_DIALOG = "two_button_dialog";
+
         public static final String UPLOADING_KEY = "uploading_data_key";
+        public static final String FETCHING_DATA = "fetching_data_key";
+
+        public static final String SHIFT_SUBMISSION_ERROR = "shift_submission_error";
+        public static final String SPEC_SETTINGS_VALIDATION_ERROR = "spec_settings_validation_error";
     }
 }

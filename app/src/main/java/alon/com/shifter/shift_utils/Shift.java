@@ -8,7 +8,6 @@ import java.io.Serializable;
 
 public class Shift implements Serializable {
 
-
     private ShiftInfo[] mShifts = {new ShiftInfo(), new ShiftInfo(), new ShiftInfo(), new ShiftInfo(), new ShiftInfo(), new ShiftInfo(), new ShiftInfo()};
 
     private Comment[] mComments = {new Comment(), new Comment(), new Comment(), new Comment(), new Comment(), new Comment(), new Comment()};

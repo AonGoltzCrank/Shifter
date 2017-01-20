@@ -2,6 +2,7 @@ package alon.com.shifter.utils;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DialogFragment;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -41,6 +42,7 @@ import alon.com.shifter.base_classes.Consts;
 import alon.com.shifter.base_classes.FinishableTask;
 import alon.com.shifter.base_classes.Linker;
 import alon.com.shifter.base_classes.TaskResult;
+import alon.com.shifter.dialog_fragments.ProgressDialogFragment;
 import alon.com.shifter.shift_utils.SpecSettings;
 
 import static alon.com.shifter.utils.FlowController.addGateOpenListener;
@@ -69,17 +71,14 @@ public final class Util implements Consts {
      * Since this class is a singleton all functions in the constructor only need to run once for example;
      * Getting the user's phone number (if needed).
      *
-     * @param con
-     *         - the context that ran the util class, since we control the flow in the application we can say with certainty,
-     *         that only {@link Activity_Login} will be used to run the constructor.
+     * @param con - the context that ran the util class, since we control the flow in the application we can say with certainty,
+     *            that only {@link Activity_Login} will be used to run the constructor.
      */
     private Util(final Context con) {
         if (con instanceof Activity_Login) {
             getPhoneNumber(con);
-//
 //            if (FirebaseUtil.getFirebaseAuth().getCurrentUser() != null)
 //                new BackgroundInfoFetcher().execute((Activity) mCon);
-
             FinishableTask mTask = new FinishableTask() {
                 int gateOpenCount = 0;
 
@@ -89,7 +88,7 @@ public final class Util implements Consts {
                     if (gateOpenCount == 2) new IPUploadTask().execute(con);
                 }
             };
-            addGateOpenListener(Fc_Keys.LOGIN_OR_REGISTER_FINISHED, mTask);
+            addGateOpenListener(Fc_Keys.LOGIN_OR_REGISTER_FINISHED, mTask, true);
             addGateOpenListener(Fc_Keys.USER_IP_PULLED, mTask);
         }
     }
@@ -98,9 +97,7 @@ public final class Util implements Consts {
     /**
      * Getting the instance of the util class.
      *
-     * @param con
-     *         - the context of the class.
-     *
+     * @param con - the context of the class.
      * @return {@link #instance}.
      */
     public static Util getInstance(Context con) {
@@ -111,10 +108,8 @@ public final class Util implements Consts {
      * A method used to check if an email matches this pattern:
      * [Any legitimate string for an email]@[Any legitimate string for an email].
      *
-     * @param mail
-     *         - the address.
-     * @param taskResult
-     *         - the result to be executed once there is a result from the validation.
+     * @param mail       - the address.
+     * @param taskResult - the result to be executed once there is a result from the validation.
      */
     public void validateEmail(String mail, TaskResult taskResult) {
         final String mailPattern = "^[_A-Za-z0-9-\\+]+(\\.[_A-Za-z0-9-]+)*@"
@@ -129,13 +124,9 @@ public final class Util implements Consts {
     /**
      * Read a preference from {@link SharedPreferences}.
      *
-     * @param con
-     *         - the activity that is calling this function.
-     * @param key
-     *         - the key, from {@link alon.com.shifter.base_classes.Consts.Pref_Keys}.
-     * @param defaultReturnVal
-     *         - the default return value, used to determine the function used to get the preference.
-     *
+     * @param con              - the activity that is calling this function.
+     * @param key              - the key, from {@link alon.com.shifter.base_classes.Consts.Pref_Keys}.
+     * @param defaultReturnVal - the default return value, used to determine the function used to get the preference.
      * @return - an object of the preference, or the defaultReturnVal if no such preference exists.
      */
     @SuppressWarnings("unchecked")
@@ -156,17 +147,16 @@ public final class Util implements Consts {
             } catch (JSONException e) {
                 e.printStackTrace();
             }
-        }
+        } else if (defaultReturnVal instanceof Long)
+            mPrefVal = mPrefs.getLong(key, (Long) defaultReturnVal);
         return mPrefVal;
     }
 
     /**
      * Write a preference, or override one.
      *
-     * @param con
-     *         - the activity that is calling this function.
-     * @param data
-     *         - the set of key and value (must be length % 2 == 0).
+     * @param con  - the activity that is calling this function.
+     * @param data - the set of key and value (must be length % 2 == 0).
      */
     @SuppressWarnings("unchecked")
     public void writePref(Context con, Object... data) {
@@ -198,12 +188,9 @@ public final class Util implements Consts {
     /**
      * Write an object to a file on the phone.
      *
-     * @param con
-     *         - the context calling the method.
-     * @param fileName
-     *         - the file name, from {@link alon.com.shifter.base_classes.Consts.Strings}.
-     * @param data
-     *         - the object to be writen to the file.
+     * @param con      - the context calling the method.
+     * @param fileName - the file name, from {@link alon.com.shifter.base_classes.Consts.Strings}.
+     * @param data     - the object to be writen to the file.
      */
     public void writeObject(Context con, String fileName, Object data) {
         File mFileDir;
@@ -227,11 +214,8 @@ public final class Util implements Consts {
     /**
      * Reads an object from a file on the phone.
      *
-     * @param con
-     *         - the activity calling this function.
-     * @param fileName
-     *         - the file name, from {@link alon.com.shifter.base_classes.Consts.Strings}.
-     *
+     * @param con      - the activity calling this function.
+     * @param fileName - the file name, from {@link alon.com.shifter.base_classes.Consts.Strings}.
      * @return - a {@link Serializable} object if a file exists, null if otherwise.
      */
     @Nullable
@@ -246,11 +230,8 @@ public final class Util implements Consts {
     }
 
     /**
-     * @param firstAct
-     *         - the calling activity.
-     * @param secAct
-     *         - the call to be loaded.
-     *
+     * @param firstAct - the calling activity.
+     * @param secAct   - the call to be loaded.
      * @see Intent#Intent(Context, Class)
      * @see Activity#startActivity(Intent)
      */
@@ -259,13 +240,9 @@ public final class Util implements Consts {
     }
 
     /**
-     * @param firstAct
-     *         - the calling activity.
-     * @param secAct
-     *         - the call to be loaded.
-     * @param bundle
-     *         - the bundle to add to the intent (see: {@link Intent#putExtras(Bundle)}).
-     *
+     * @param firstAct - the calling activity.
+     * @param secAct   - the call to be loaded.
+     * @param bundle   - the bundle to add to the intent (see: {@link Intent#putExtras(Bundle)}).
      * @see Intent#Intent(Context, Class)
      * @see Activity#startActivity(Intent)
      */
@@ -281,11 +258,8 @@ public final class Util implements Consts {
     /**
      * Get a day name in hebrew according to an int, otherwise throw an exception.
      *
-     * @param con
-     *         - the activity calling this function.
-     * @param day
-     *         - the day
-     *
+     * @param con - the activity calling this function.
+     * @param day - the day
      * @return - a string representing the day.
      */
     @NonNull
@@ -303,11 +277,8 @@ public final class Util implements Consts {
     /**
      * Get a shift name in hebrew, according to an int, otherwise throw an exception.
      *
-     * @param con
-     *         - the activity calling this function.
-     * @param num
-     *         - the shift
-     *
+     * @param con - the activity calling this function.
+     * @param num - the shift
      * @return - a string representing the shift title.
      */
     @NonNull
@@ -320,11 +291,45 @@ public final class Util implements Consts {
     }
 
     /**
+     * Creates a {@link ProgressDialog} that only asks the user to wait until something finishes running.
+     *
+     * @param con - the activity calling this function.
+     * @return - the {@link ProgressDialog}.
+     */
+    public ProgressDialogFragment generateStandbyDialog(Context con) {
+        ProgressDialogFragment mDialog = new ProgressDialogFragment();
+        mDialog.setTitle(con.getString(R.string.dialog_getting_data));
+        mDialog.setMessage(con.getString(R.string.please_wait));
+        mDialog.setStyle(DialogFragment.STYLE_NO_TITLE, 0);
+        mDialog.show(((Activity) con).getFragmentManager(), DialogFragment_Keys.FETCHING_DATA);
+
+        return mDialog;
+    }
+//
+//    private class BackgroundInfoFetcher extends AsyncTask<Object, Void, Void> {
+//
+//        private final String ipURL = "http://bot.whatismyipaddress.com/";
+//
+//        @Override
+//        protected Void doInBackground(Object... params) {
+//            Context mCon = (Context) params[0];
+//            try {
+//                Linker linker = Linker.getLinker((Activity) mCon, Linker_Keys.TYPE_INFO_FETCHER);
+//                linker.addParamToTask(Linker_Keys.KEY_IP_FETCH_ADDR, ipURL);
+//                linker.execute();
+//            } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e) {
+//                e.printStackTrace();
+//            }
+//            return null;
+//        }
+//    }
+
+
+    /**
      * A function that needs to run only once in the entire application existance on a phone.
      * Used to prompt the user to give us his phone number for later use.
      *
-     * @param con
-     *         - the activity calling the method.
+     * @param con - the activity calling the method.
      */
     private void getPhoneNumber(final Context con) {
         if (readPref(con, Pref_Keys.USR_NUMBER, Strings.NULL).equals(Strings.NULL)) {
@@ -360,40 +365,7 @@ public final class Util implements Consts {
         }
     }
 
-    /**
-     * Creates a {@link ProgressDialog} that only asks the user to wait until something finishes running.
-     *
-     * @param con
-     *         - the activity calling this function.
-     *
-     * @return - the {@link ProgressDialog}.
-     */
-    public ProgressDialog generateStandbyDialog(Context con) {
-        ProgressDialog mDialog = new ProgressDialog(con);
-        mDialog.setTitle(R.string.please_wait_eng);
-        mDialog.setMessage(con.getString(R.string.please_wait));
-        mDialog.setCancelable(false);
-        mDialog.show();
-        return mDialog;
-    }
-//
-//    private class BackgroundInfoFetcher extends AsyncTask<Object, Void, Void> {
-//
-//        private final String ipURL = "http://bot.whatismyipaddress.com/";
-//
-//        @Override
-//        protected Void doInBackground(Object... params) {
-//            Context mCon = (Context) params[0];
-//            try {
-//                Linker linker = Linker.getLinker((Activity) mCon, Linker_Keys.TYPE_INFO_FETCHER);
-//                linker.addParam(Linker_Keys.KEY_IP_FETCH_ADDR, ipURL);
-//                linker.execute();
-//            } catch (Linker.ProductionLineException | Linker.InsufficientParametersException e) {
-//                e.printStackTrace();
-//            }
-//            return null;
-//        }
-//    }
+    //==============================================================
 
     /**
      * A class that is used to create a linker in order to handling phone number check.
@@ -436,6 +408,8 @@ public final class Util implements Consts {
             return null;
         }
     }
+
+    //==============================================================
 
     /**
      * A class used to upload the IP of a user to the database, whilst retaining the user's {@link BaseUser} object on the server without change.

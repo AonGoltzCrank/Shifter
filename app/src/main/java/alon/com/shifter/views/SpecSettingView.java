@@ -16,21 +16,59 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.TreeMap;
 
 import alon.com.shifter.R;
 import alon.com.shifter.base_classes.Consts;
+import alon.com.shifter.wrappers.OnCheckedChangedWrapper;
+import alon.com.shifter.wrappers.OnClickWrapper;
 
+import static alon.com.shifter.wrappers.WrapperBase.CHECK_BOX_ID;
+import static alon.com.shifter.wrappers.WrapperBase.LAYOUT_ID;
+
+/**
+ * A class representing a single container of special settings,
+ * It contains one header, which states the special settings name, in the form of a layout,
+ * and one layout containing multiple layouts, each of which contains a textview and a checkbox, which represent the sub-settings for
+ * this particular special setting.
+ */
+@SuppressWarnings("RedundantCast")
 public class SpecSettingView extends LinearLayout {
 
+    /**
+     * The tag for the header container.
+     */
     private static final String HEADER_TAG = "Header_Check_Box";
+    /**
+     * The tag for the child container.
+     */
     private static final String CHILD_TAG = "Child_Tag";
-    private final ArrayList<String> childrenSelected = new ArrayList<>();
-    private String header;
-    private String children;
-    private String restriction;
-    private int restValue;
+    /**
+     * A sorted map for the values.
+     */
+    private final TreeMap<Integer, String> mChildrenSelected = new TreeMap<>();
+    /**
+     * The name of the header in this special settings.
+     */
+    private String mHeader;
+    /**
+     * The name of chidren for this special settings.
+     */
+    private String mChildren;
+    /**
+     * The behavioural restrictions for this special settings.
+     */
+    private String mRestrictions;
+    /**
+     * The value for the restriction.
+     */
+    private int mRestValue;
+
     private Context mCon;
+
     private Toast mToast;
+
     private ArrayList<CheckBox> mBoxes = new ArrayList<>();
 
     @SuppressLint("ShowToast")
@@ -41,75 +79,83 @@ public class SpecSettingView extends LinearLayout {
         mToast = Toast.makeText(context, R.string.spec_setting_limit_amount, Toast.LENGTH_SHORT);
     }
 
-    public void setChildren(String children) {
-        this.children = children;
-    }
-
-    public void setRestrictions(String rest, int value) {
-        restriction = rest;
-        restValue = value;
-    }
-
+    /**
+     * The function creates the headers and mChildren of said headers for the view, as well as setting the onCheckedChangedListener for each child and parent.
+     */
     public void genViews() {
-        if (header != null && children != null) {
+        if (mHeader != null && mChildren != null) {
             LayoutParams mHeaderParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             LayoutParams mChildParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             LayoutParams mDefaultParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 
+            //Contains all mHeader views.
             LinearLayout mHeader = new LinearLayout(mCon);
             mHeader.setOrientation(HORIZONTAL);
             mHeader.setWeightSum(1);
 
-            final LinearLayout mContainer = new LinearLayout(mCon);
+            // Contains all child views for mHeader
+            LinearLayout mContainer = new LinearLayout(mCon);
             mContainer.setOrientation(VERTICAL);
             mContainer.setVisibility(View.GONE);
 
-            final CheckBox mActiveCat = new CheckBox(mCon);
+            CheckBox mActiveCat = new CheckBox(mCon);
             TextView mTitle = new TextView(mCon);
-            mTitle.setText(header);
+            mTitle.setText(this.mHeader);
             mTitle.setTextAppearance(mCon, android.R.style.TextAppearance_DeviceDefault_Medium);
             mTitle.setTypeface(Typeface.DEFAULT_BOLD);
             mTitle.setGravity(Gravity.CENTER);
-            mTitle.setOnClickListener(new OnClickListener() {
+            OnClickWrapper wrapper = new OnClickWrapper() {
                 @Override
                 public void onClick(View v) {
-                    mActiveCat.setChecked(!mActiveCat.isChecked());
+                    ((CheckBox) getWrapperParam(CHECK_BOX_ID)).setChecked(!((CheckBox) getWrapperParam(CHECK_BOX_ID)).isChecked());
                 }
-            });
+            };
+            wrapper.setWrapperParam(CHECK_BOX_ID, mActiveCat);
+            mTitle.setOnClickListener(wrapper);
 
             mHeaderParams.weight = 0.925f;
 
             mHeader.addView(mTitle, mHeaderParams);
 
             mActiveCat.setText("");
-            mActiveCat.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            mActiveCat.setTag(mTitle.getText().toString());
+            OnCheckedChangedWrapper wrapperChecked = new OnCheckedChangedWrapper() {
                 @Override
                 public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                    LinearLayout mLayout = (LinearLayout) getWrapperParam(LAYOUT_ID);
                     if (isChecked) {
-                        mContainer.setVisibility(View.VISIBLE);
+                        mLayout.setVisibility(View.VISIBLE);
+                        //Loop through all child checkboxes.
                         for (CheckBox cb : mBoxes) {
                             if (cb.isChecked()) {
-                                for (int i = 0; i < mContainer.getChildCount(); i++) {
-                                    LinearLayout mLayout = (LinearLayout) mContainer.getChildAt(i);
-                                    if (mLayout.getChildAt(0) instanceof CheckBox) {
-                                        if (((CheckBox) mLayout.getChildAt(0)).isChecked())
-                                            if (!childrenSelected.contains(((TextView) mLayout.getChildAt(1)).getText().toString()))
-                                                childrenSelected.add(((TextView) mLayout.getChildAt(1)).getText().toString());
-                                    } else if (mLayout.getChildAt(1) instanceof CheckBox) {
-                                        if (((CheckBox) mLayout.getChildAt(1)).isChecked())
-                                            if (!childrenSelected.contains(((TextView) mLayout.getChildAt(0)).getText().toString()))
-                                                childrenSelected.add(((TextView) mLayout.getChildAt(0)).getText().toString());
-
+                                for (int i = 0; i < mLayout.getChildCount(); i++) {
+                                    LinearLayout layout = (LinearLayout) mLayout.getChildAt(i);
+                                    int cbIndex = layout.getChildAt(0) instanceof CheckBox ? 0 : 1;
+                                    CheckBox checkBox = (CheckBox) layout.getChildAt(cbIndex);
+                                    TextView textView = (TextView) layout.getChildAt(cbIndex == 0 ? 1 : 0);
+                                    if (checkBox.getTag() != null) {
+                                        int tag = (int) checkBox.getTag();
+                                        String setting = mChildrenSelected.get(tag);
+                                        if (setting == null || setting.isEmpty())
+                                            mChildrenSelected.put(tag, textView.getText().toString());
+                                        else if (!setting.equals(textView.getText().toString())) {
+                                            Log.i(CHILD_TAG, "onCheckedChanged: changing setting from: " + setting + " to: " + textView.getText().toString());
+                                            mChildrenSelected.put(tag, textView.getText().toString());
+                                        } else
+                                            Log.i(CHILD_TAG, "onCheckedChanged: tried to set the same tag.");
                                     }
                                 }
                             }
                         }
                     } else {
-                        mContainer.setVisibility(View.GONE);
-                        childrenSelected.clear();
+                        //If the header isn't checked then remove all selected items.
+                        mLayout.setVisibility(View.GONE);
+                        mChildrenSelected.clear();
                     }
                 }
-            });
+            };
+            wrapperChecked.setWrapperParam(LAYOUT_ID, mContainer);
+            mActiveCat.setOnCheckedChangeListener(wrapperChecked);
 
             mHeaderParams.weight = 1 - mHeaderParams.weight;
 
@@ -127,9 +173,10 @@ public class SpecSettingView extends LinearLayout {
 
             addView(mSep, mSepParams);
 
-            String[] childrenTemp = this.children.split("~");
-            final String[] childrenSet = new String[childrenTemp.length - 1];
+            String[] childrenTemp = this.mChildren.split("~");
+            String[] childrenSet = new String[childrenTemp.length - 1];
             System.arraycopy(childrenTemp, 1, childrenSet, 0, childrenTemp.length - 1);
+            int count = 0;
             for (String child : childrenSet) {
                 LinearLayout mAddedLayout = new LinearLayout(mCon);
                 mAddedLayout.setOrientation(HORIZONTAL);
@@ -138,6 +185,7 @@ public class SpecSettingView extends LinearLayout {
 
                 final CheckBox mBox = new CheckBox(mCon);
                 mBox.setText("");
+                mBox.setTag(count++);
                 final TextView mChildName = new TextView(mCon);
 
                 child = "\t" + child;
@@ -159,13 +207,14 @@ public class SpecSettingView extends LinearLayout {
                 mBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
                     @Override
                     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                        switch (restriction) {
+                        int tag = (int) buttonView.getTag();
+                        switch (mRestrictions) {
                             case Consts.Strings.MGR_SEC_SPEC_SETTING_REST_LIMIT_AMOUNT:
-                                if (getCheckedAmount() <= restValue)
+                                if (getCheckedAmount() <= mRestValue)
                                     if (isChecked) {
-                                        childrenSelected.add(mChildName.getText().toString());
+                                        mChildrenSelected.put(tag, mChildName.getText().toString());
                                     } else
-                                        childrenSelected.remove(mChildName.getText().toString());
+                                        mChildrenSelected.remove(tag);
                                 else {
                                     mBox.setChecked(false);
                                     if (!mToast.getView().isShown())
@@ -183,17 +232,17 @@ public class SpecSettingView extends LinearLayout {
                                         if (cb != mBox)
                                             cb.setChecked(false);
                                         else {
-                                            childrenSelected.clear();
-                                            childrenSelected.add(mChildName.getText().toString());
+                                            mChildrenSelected.clear();
+                                            mChildrenSelected.put(tag, mChildName.getText().toString());
                                         }
                                     }
 
                                 break;
                             default:
                                 if (isChecked) {
-                                    childrenSelected.add(mChildName.getText().toString());
+                                    mChildrenSelected.put(tag, mChildName.getText().toString());
                                 } else
-                                    childrenSelected.remove(mChildName.getText().toString());
+                                    mChildrenSelected.remove(tag);
                                 break;
                         }
                     }
@@ -207,36 +256,52 @@ public class SpecSettingView extends LinearLayout {
             mContainer.setTag(CHILD_TAG);
             addView(mContainer, mDefaultParams);
         } else
-            throw new RuntimeException("Header or children are not setGate.");
+            throw new RuntimeException("Header or mChildren are not setGate.");
     }
 
     public boolean isSelected() {
-        return childrenSelected.isEmpty();
+        return mChildrenSelected.isEmpty();
+    }
+
+    public boolean isActive() {
+        LinearLayout mHeader = (LinearLayout) findViewWithTag(HEADER_TAG);
+        for (int i = 0; i < mHeader.getChildCount(); i++) {
+            View mView = mHeader.getChildAt(i);
+            if (mView instanceof CheckBox)
+                return ((CheckBox) mView).isChecked();
+        }
+        return false;
+    }
+
+    public boolean isAnyChildChecked() {
+        LinearLayout mChildLayout = (LinearLayout) findViewWithTag(CHILD_TAG);
+        for (int i = 0; i < mChildLayout.getChildCount(); i++) {
+            LinearLayout mGrandChild = (LinearLayout) mChildLayout.getChildAt(i);
+            for (int j = 0; j < mGrandChild.getChildCount(); j++) {
+                View mView = mGrandChild.getChildAt(j);
+                if (mView instanceof CheckBox)
+                    if (((CheckBox) mView).isChecked())
+                        return true;
+            }
+        }
+        return false;
     }
 
     public String getChildrenSelected() {
-        if (!childrenSelected.isEmpty()) {
+        if (!mChildrenSelected.isEmpty()) {
             String children = "";
-            for (String str : childrenSelected)
-                children += str.trim() + "~";
+            for (Map.Entry<Integer, String> str : mChildrenSelected.entrySet())
+                children += str.getValue().trim() + "~";
             return children.substring(0, children.lastIndexOf('~'));
         } else return "";
     }
 
-    private int getCheckedAmount() {
-        int count = 0;
-        for (CheckBox mBox : mBoxes)
-            if (mBox.isChecked())
-                count++;
-        return count;
-    }
-
     public String getHeader() {
-        return header;
+        return mHeader;
     }
 
-    public void setHeader(String header) {
-        this.header = header;
+    public void setHeader(String mHeader) {
+        this.mHeader = mHeader;
     }
 
     public void setHeaderChecked(boolean flag) {
@@ -281,27 +346,21 @@ public class SpecSettingView extends LinearLayout {
         }
     }
 
-    public boolean isActive() {
-        LinearLayout mHeader = (LinearLayout) findViewWithTag(HEADER_TAG);
-        for (int i = 0; i < mHeader.getChildCount(); i++) {
-            View mView = mHeader.getChildAt(i);
-            if (mView instanceof CheckBox)
-                return ((CheckBox) mView).isChecked();
-        }
-        return false;
+    public void setChildren(String mChildren) {
+        this.mChildren = mChildren;
     }
 
-    public boolean isAnyChildChecked() {
-        LinearLayout mChildLayout = (LinearLayout) findViewWithTag(CHILD_TAG);
-        for (int i = 0; i < mChildLayout.getChildCount(); i++) {
-            LinearLayout mGrandChild = (LinearLayout) mChildLayout.getChildAt(i);
-            for (int j = 0; j < mGrandChild.getChildCount(); j++) {
-                View mView = mGrandChild.getChildAt(j);
-                if (mView instanceof CheckBox)
-                    if (((CheckBox) mView).isChecked())
-                        return true;
-            }
-        }
-        return false;
+    public void setRestrictions(String rest, int value) {
+        mRestrictions = rest;
+        mRestValue = value;
     }
+
+    private int getCheckedAmount() {
+        int count = 0;
+        for (CheckBox mBox : mBoxes)
+            if (mBox.isChecked())
+                count++;
+        return count;
+    }
+
 }

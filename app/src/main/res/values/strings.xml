@@ -93,7 +93,7 @@
     <string name="mgr_shift_hours">הגדרת שעות למשמרת</string>
     <string name="mgr_shift_hour_setting">הגדרות שעות למשמרות</string>
     <string name="mgr_set_hours">הגדר שעות</string>
-    <string name="mgr_explanation_shift_hours">כאן תוכל להגדיר את השעות עבור משמרות (בקור, צהריים, ערב ולילה).אנא שים לב שניתן להגדיר באופן פרטני עבור כל עובד בעת הגדרת הסידור.</string>
+    <string name="mgr_explanation_shift_hours">כאן תוכל להגדיר את השעות עבור משמרות (בוקר, צהריים, ערב ולילה). אנא שים לב שניתן להגדיר באופן פרטני עבור כל עובד בעת הגדרת הסידור.</string>
     <string name="mgr_msg_hour_set">(מוגדר)</string>
 
     <string name="dialog_shift_hours_title">Set Shift Default Time</string>
@@ -115,14 +115,15 @@
     <string name="mgr_accmgr_df_email_title"><u>אימייל:</u></string>
     <string name="mgr_accmgr_df_phone_title"><u>מספר טלפון:</u></string>
     <string name="mgr_accmgr_df_job_title"><u>תפקיד:</u></string>
+    <string name="mgr_accmgr_df_rating"><u>דירוג:</u></string>
     <string name="mgr_accmgr_df_delete">מחק משתמש</string>
     <string name="mgr_accmgr_delete_acc_sure">האם אתה בטוח שאתה רוצה למחוק את המשמתש?</string>
     <string name="mgr_accmgr_title">ניהול משתמשים</string>
-    <string name="mgr_accmgr_user_mgr">User Info Sheet</string>
+    <string name="mgr_accmgr_user_mgr">גיליון מידע עבור משתמש</string>
     <string name="mgr_accmgr_not_approved_yet">המשתמש לא מאושר עדיין, לא ניתן להציג נתונים לגביו</string>
     <string name="user_deleted">המשתמש שלך נמחק, צור קשר עם המנהל</string>
     <string name="submit">הגש</string>
-    <string name="user_shift_submission_unapproved">על מנת לבור את המשמרות שאתם רוצים להגיש כ\"פתוח\" צריך ללחוץ על הכפתור התואם. לחיצה ארוכה תציג דיאלוג שבו תוכלו להוסיף הערה עבור המנהל.</string>
+    <string name="user_shift_submission_unapproved">על מנת לבחור את המשמרות שאתם רוצים להגיש כ\"פתוח\" צריך ללחוץ על הכפתור התואם. לחיצה ארוכה תציג דיאלוג שבו תוכלו להוסיף הערה עבור המנהל.</string>
     <string name="user_shift_comment">הערה למנהל משמרות</string>
     <string name="user_show_shifts">הצג סידור</string>
     <string name="user_shift_submission_error">שגיאה בעת הגשת משמרות</string>
@@ -132,4 +133,11 @@
     <string name="err_shift_open_close_msg">המנהל אוסר עלייך להגיש סגירה ואז פתיחה.</string>
     <string name="err_shift_amount_msg_2">משמרות בשבוע</string>
     <string name="user_uploading_shifts">מעלה את המשמרת…</string>
+    <string name="dialog_getting_data">ממתין למידע מהשרת</string>
+    <string name="are_you_sure">להמשיך?</string>
+    <string name="err_spec_settings_min_shifts">דרשת שיוגשו יותר משמרת מאשר פתחת להגשה.</string>
+    <string name="err_spec_settings_certain_shift">דרשת שיוגש משמרת מסוימת ךפחות אחת לשבוע, אך לא פתחת את המשמרת הזו כלל.</string>
+    <string name="err_spec_settings_certain_day">דרשת שיוגש משמרת במהלך יום מסוים, אך חסמת את היום הזה להגשה.</string>
+    <string name="dialog_failed_validation_spec_settings">אי התאמה בין הגדרות מיוחדות והגדרות משמרת</string>
+    <string name="mgr_other_settings">הגדרות אחרות</string>
 </resources>

@@ -53,6 +53,8 @@
         <activity
             android:name=".activities.Activity_Shifter_User_Submit"
             android:screenOrientation="landscape"/>
+        <activity android:name=".activities.Activity_User_Phonebook">
+        </activity>
     </application>
 
 </manifest>

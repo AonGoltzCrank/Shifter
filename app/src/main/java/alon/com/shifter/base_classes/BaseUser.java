@@ -67,6 +67,13 @@ public class BaseUser implements Serializable {
      */
     private boolean mIsManager = false;
 
+
+    /**
+     * The rating of the user, from 0 to 5.
+     * Will be used in auto generation of a schedule.
+     */
+    private int mRating = 0;
+
     /**
      * A default {@link BaseUser} instance, empty.
      */
@@ -124,6 +131,7 @@ public class BaseUser implements Serializable {
         mUser.setUID(map.get("uid").toString());
         mUser.setCode(map.get("code").toString());
         mUser.setJobType(((Long) map.get("jobType")).intValue());
+        mUser.setRating(((Long) map.get("rating")).intValue());
         return mUser;
     }
 
@@ -197,5 +205,13 @@ public class BaseUser implements Serializable {
 
     public void setIsManager(boolean mIsManager) {
         this.mIsManager = mIsManager;
+    }
+
+    public int getRating() {
+        return mRating;
+    }
+
+    public void setRating(int mRating) {
+        this.mRating = mRating;
     }
 }

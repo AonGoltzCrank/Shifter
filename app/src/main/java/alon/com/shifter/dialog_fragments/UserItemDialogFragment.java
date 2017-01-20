@@ -35,14 +35,21 @@ public class UserItemDialogFragment extends DialogFragment {
 
     private Context mCon;
 
+    private String mTitle;
+
     @Nullable
     @Override
+
     public View onCreateView(LayoutInflater inflater, final ViewGroup container, Bundle savedInstanceState) {
         View mView = inflater.inflate(R.layout.dialog_fragment_user_info, container, false);
+
+        ((TextView) mView.findViewById(R.id.dialog_title)).setText(mTitle);
+
         TextView mName = (TextView) mView.findViewById(R.id.DF_UI_name);
         TextView mEmail = (TextView) mView.findViewById(R.id.DF_UI_email);
         TextView mPhoneNumber = (TextView) mView.findViewById(R.id.DF_UI_phone);
         mJobType = (Spinner) mView.findViewById(R.id.DF_UI_job_type);
+        final Spinner mRating = (Spinner) mView.findViewById(R.id.DF_UI_rating);
         Button mDelete = (Button) mView.findViewById(R.id.DF_UI_delete_user);
         Button mBack = (Button) mView.findViewById(R.id.DF_UI_back);
 
@@ -61,17 +68,24 @@ public class UserItemDialogFragment extends DialogFragment {
             ArrayAdapter<String> mJobTypes = new ArrayAdapter<>(mCon, android.R.layout.simple_list_item_1,
                     Util.getInstance(mCon)
                             .readPref(mCon, Consts.Pref_Keys.GENERAL_INFO_JOB_TYPES, Consts.Strings.NULL).toString().split("~"));
+            ArrayAdapter<Integer> mRatings = new ArrayAdapter<>(mCon, android.R.layout.simple_list_item_1, new Integer[]{0, 1, 2, 3, 4, 5});
             mJobType.setAdapter(mJobTypes);
+            mRating.setAdapter(mRatings);
             if (mUser.getJobType() != -1)
                 mJobType.setSelection(mUser.getJobType());
+            if (mUser.getRating() > 0 && mUser.getRating() <= 5)
+                mRating.setSelection(mUser.getRating());
+            else
+                mRating.setSelection(2);
         }
 
         mBack.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (mJobType.getSelectedItemPosition() != mUser.getJobType()) {
+                if (mJobType.getSelectedItemPosition() != mUser.getJobType())
                     mUser.setJobType(mJobType.getSelectedItemPosition());
-                }
+                if (mRating.getSelectedItemPosition() != mUser.getRating())
+                    mUser.setRating(mRating.getSelectedItemPosition());
                 dismiss();
             }
         });
@@ -96,8 +110,6 @@ public class UserItemDialogFragment extends DialogFragment {
                 }).show();
             }
         });
-
-        getDialog().setTitle(R.string.mgr_accmgr_user_mgr);
         return mView;
     }
 
@@ -111,5 +123,9 @@ public class UserItemDialogFragment extends DialogFragment {
 
     public void setCon(Context mCon) {
         this.mCon = mCon;
+    }
+
+    public void setTitle(String title) {
+        mTitle = title;
     }
 }

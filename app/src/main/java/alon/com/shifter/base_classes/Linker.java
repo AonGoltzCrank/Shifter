@@ -39,8 +39,8 @@ import java.util.Set;
 import alon.com.shifter.R;
 import alon.com.shifter.activities.Activity_Shifter_Main_Manager;
 import alon.com.shifter.activities.Activity_Shifter_Main_User;
-import alon.com.shifter.base_classes.DelayedTaskExecutor.DelayedTask;
 import alon.com.shifter.dialog_fragments.ProgressDialogFragment;
+import alon.com.shifter.dialog_fragments.TwoButtonDialogFragment;
 import alon.com.shifter.shift_utils.Comment;
 import alon.com.shifter.shift_utils.Shift;
 import alon.com.shifter.shift_utils.ShiftInfo;
@@ -129,17 +129,7 @@ public class Linker {
      * @throws ProductionLineException
      */
     public static Linker getLinker(Activity caller, int type) throws ProductionLineException {
-        int count = 0;
-        int[] occupied = new int[5];
-        for (int i = 0, j = 0; i < limit; i++)
-            if (factoryLine[i] == null)
-                count++;
-            else
-                occupied[j++] = i;
-        //Inform us what positions are empty.
-        Log.i("LINKER_PROD_LINE_INF", "getLinker:\n" +
-                "Current amount of free linker slots: " + (count) +
-                "\nCurrent occupied linker positions: " + Arrays.toString(occupied));
+        countProdLine();
         if (limit < currentNumberOfLinkers)
             throw new ProductionLineException();
         if (currentFreeSlot == 5)
@@ -154,6 +144,21 @@ public class Linker {
     }
 
     //================================================
+
+    private static void countProdLine() {
+        int count;
+        count = 0;
+        int[] occupied = new int[5];
+        for (int i = 0, j = 0; i < limit; i++)
+            if (factoryLine[i] == null)
+                count++;
+            else
+                occupied[j++] = i;
+        //Inform us what positions are empty.
+        Log.i("LINKER_PROD_LINE_INF", "getLinker:\n" +
+                "Current amount of free linker slots: " + (count) +
+                "\nCurrent occupied linker positions: " + Arrays.toString(occupied));
+    }
 
     @Override
     public String toString() {
@@ -177,10 +182,11 @@ public class Linker {
                 System.gc();
                 currentFreeSlot = count;
                 currentNumberOfLinkers--;
-                return;
+                break;
             }
             count++;
         }
+        countProdLine();
     }
 
     /**
@@ -313,10 +319,13 @@ public class Linker {
      * 10) Next it gets a {@link Set} of all users' UID. It compares it to the {@link android.content.SharedPreferences}, if a value exists.
      * If they match it continues to the next task, otherwise it sets the pulled set as the one in the preferences.
      * It sets {@link alon.com.shifter.base_classes.Consts.Fc_Keys#USER_LIST_PULLED} to true and continues to the next task.<br>
-     * 11) Next it gets the a {@link String} of all job types. It compares it to the {@link android.content.SharedPreferences}, if a value exists.
+     * 11) Next it gets a {@link String} of all job types. It compares it to the {@link android.content.SharedPreferences}, if a value exists.
      * If they match it continues to the next task, otherwise it sets the pulled string as the one in the preferences.
      * It sets {@link alon.com.shifter.base_classes.Consts.Fc_Keys#JOBS_PULLED} to true and continues to the next task.<br>
-     * 12) Erases the linker.
+     * 12) Next it gets the {@link Boolean} value of if a schedule was set, if it was, it sets a {@link android.content.SharedPreferences}
+     * value of  {@link alon.com.shifter.base_classes.Consts.Pref_Keys#MGR_SEC_SCHEDULE_SET} to true so that it never checks again,
+     * otherwise it prompts the user to set the info.<br>
+     * 13) Erases the linker.
      * </p>
      * </li>
      * <li>
@@ -422,7 +431,7 @@ public class Linker {
                             mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PASS) &&
                             mParams.containsKey(Consts.Linker_Keys.KEY_LOGIN_PHONE));
                     if (containsAllRequiredParams) {
-                        final ProgressDialog mDialog = (ProgressDialog) mParams.get(Consts.Linker_Keys.KEY_LOGIN_DIALOG);
+                        final ProgressDialogFragment mDialog = (ProgressDialogFragment) mParams.get(Consts.Linker_Keys.KEY_LOGIN_DIALOG);
                         final FinishableTask mFinishedProcess = new FinishableTask() {
                             @Override
                             public void onFinish() {
@@ -527,7 +536,7 @@ public class Linker {
                     containsAllRequiredParams = (mParams.containsKey(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT) && mParams.containsKey(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG));
                     if (containsAllRequiredParams) {
                         final Shift mShift = (Shift) mParams.get(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_SHIFT_OBJECT);
-                        final AlertDialog mDialog = (AlertDialog) mParams.get(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG);
+                        final TwoButtonDialogFragment mDialog = (TwoButtonDialogFragment) mParams.get(Consts.Linker_Keys.KEY_SHIFT_UPLOAD_DIALOG);
                         try {
                             JSONObject mJson = new JSONObject();
                             ShiftInfo[] mInfo = mShift.getInfoComplete();
@@ -541,6 +550,7 @@ public class Linker {
                             final FinishableTask mFinishedUploadingSpecSettings = new FinishableTask() {
                                 @Override
                                 public void onFinish() {
+                                    FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode()).child(Consts.Fb_Keys.MGR_SEC_SCHEDULE_SET).setValue(true);
                                     mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SCHEDULE_SET, true);
                                     mUtil.writeObject(mCaller, Consts.Strings.FILE_SHIFT_OBJECT, mShift);
                                     setGate(Consts.Fc_Keys.SCHDULE_INFO_UPLOADED, true);
@@ -601,6 +611,39 @@ public class Linker {
                                 erase();
                             }
                         };
+                        final TaskResult mGetScheduleSet = new TaskResult() {
+                            @Override
+                            public void onFail() {
+                            }
+
+                            @Override
+                            public void onSucceed() {
+                                if (!(boolean) mUtil.readPref(mCaller, Consts.Pref_Keys.MGR_SEC_SCHEDULE_SET, false))
+                                    FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC).child(FirebaseUtil.getUser().getCode()).addListenerForSingleValueEvent(new ValueEventListener() {
+                                        @Override
+                                        public void onDataChange(DataSnapshot dataSnapshot) {
+                                            for (DataSnapshot snap : dataSnapshot.getChildren()) {
+                                                if (snap.getKey().equals(Consts.Fb_Keys.MGR_SEC_SCHEDULE_SET)) {
+                                                    mUtil.writePref(mCaller, Consts.Pref_Keys.MGR_SEC_SCHEDULE_SET, snap.getValue());
+                                                    mFinishedInfoPull.onFinish();
+                                                    Log.i(TAG, "onDataChange: Added info #9; Pulled is shift schedule set.");
+                                                    return;
+                                                }
+                                            }
+                                        }
+
+                                        @Override
+                                        public void onCancelled(DatabaseError databaseError) {
+                                            Log.e(TAG, "onCancelled: failed data pull #8", databaseError.toException());
+                                            Linker.this.onFailedBackgroundDataPull();
+                                        }
+                                    });
+                                else {
+                                    Log.i(TAG, "onDataChange: Didn't pull info #9.");
+                                    mFinishedInfoPull.onFinish();
+                                }
+                            }
+                        };
                         final TaskResult mGetJobTypes = new TaskResult() {
                             @Override
                             public void onFail() {
@@ -620,12 +663,12 @@ public class Linker {
                                                     mUtil.writePref(mCaller, Consts.Pref_Keys.GENERAL_INFO_JOB_TYPES, mPulledInfo);
                                                     Log.i(TAG, "onDataChange: Added info #8; Pulled job types");
                                                     setGate(Consts.Fc_Keys.JOBS_PULLED, true);
-                                                    mFinishedInfoPull.onFinish();
+                                                    mGetScheduleSet.onSucceed();
                                                     return;
                                                 } else {
                                                     Log.i(TAG, "onDataChange: Didn't pull info #8.");
                                                     setGate(Consts.Fc_Keys.JOBS_PULLED, true);
-                                                    mFinishedInfoPull.onFinish();
+                                                    mGetScheduleSet.onSucceed();
                                                 }
                                             }
                                     }
@@ -705,7 +748,6 @@ public class Linker {
                                     @Override
                                     public void onCancelled(DatabaseError databaseError) {
                                         Log.e(TAG, "onCancelled:  Failed data pull #6", databaseError.toException());
-                                        mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
                                         mFinishedInfoPull.onFinish();
                                     }
                                 });
@@ -747,7 +789,6 @@ public class Linker {
                                             @Override
                                             public void onCancelled(DatabaseError databaseError) {
                                                 Log.e(TAG, "onCancelled:  Failed data pull #5", databaseError.toException());
-                                                mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
                                                 mGetUserRequests.onFail();
                                             }
                                         });
@@ -788,7 +829,6 @@ public class Linker {
                                     @Override
                                     public void onCancelled(DatabaseError databaseError) {
                                         Log.e(TAG, "onCancelled:  Failed data pull #4", databaseError.toException());
-                                        mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
                                         mGetSpecSettingRestrictions.onFail();
                                     }
                                 });
@@ -830,7 +870,6 @@ public class Linker {
                                     @Override
                                     public void onCancelled(DatabaseError databaseError) {
                                         Log.e(TAG, "onCancelled: Failed data pull #3", databaseError.toException());
-                                        mDelayedTaskExecutor.addTask(new DelayedTask(null, mThis, true, 5000));
                                         mGetSpecSettingExpansions.onFail();
                                     }
                                 });
@@ -865,9 +904,12 @@ public class Linker {
                                                     return;
                                                 }
                                                 setGate(Consts.Fc_Keys.SPEC_SETTINGS_SET_PULLED, true);
+                                                mGetSpecSettings.onSucceed();
                                                 Log.i(TAG, "onDataChange: Didn't pull #2.");
+                                                return;
                                             }
                                         }
+                                        setGate(Consts.Fc_Keys.SPEC_SETTINGS_SET_PULLED, false);
                                         mGetSpecSettings.onSucceed();
                                     }
 
@@ -1013,11 +1055,18 @@ public class Linker {
                 case Consts.Linker_Keys.TYPE_UPLOAD_SPEC_SETTINGS:
                     containsAllRequiredParams = mParams.containsKey(Consts.Linker_Keys.KEY_SPEC_SETTINGS);
                     if (containsAllRequiredParams)
-                        FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC)
-                                .child(FirebaseUtil.getUser().getCode()).child(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_SET)
-                                .setValue((mParams.get(Consts.Linker_Keys.KEY_SPEC_SETTINGS)).toString());
-                    else
-                        throw new InsufficientParametersException();
+                        if (!mParams.get(Consts.Linker_Keys.KEY_SPEC_SETTINGS).equals(SpecSettings.getEmpty()))
+                            FirebaseUtil.getDatabase(Consts.Fb_Dirs.MGR_SEC)
+                                    .child(FirebaseUtil.getUser().getCode()).child(Consts.Fb_Keys.MGR_SEC_SPEC_SETTINGS_SET)
+                                    .setValue((mParams.get(Consts.Linker_Keys.KEY_SPEC_SETTINGS)).toString()).addOnCompleteListener(mCaller, new OnCompleteListener<Void>() {
+                                @Override
+                                public void onComplete(@NonNull Task<Void> task) {
+                                    if (task.isComplete())
+                                        erase();
+                                }
+                            });
+                        else
+                            throw new InsufficientParametersException();
                     break;
                 //=====================================================================
                 case Consts.Linker_Keys.TYPE_DELETE_ACCOUNT:
@@ -1027,7 +1076,7 @@ public class Linker {
                         final FinishableTaskWithParams mTask = new FinishableTaskWithParams() {
                             @Override
                             public void onFinish() {
-                                String mAccepted = (String) getParams().get(Consts.Param_Keys.KEY_ACCEPTED_USERS_STRING);
+                                String mAccepted = (String) getParamsFromTask().get(Consts.Param_Keys.KEY_ACCEPTED_USERS_STRING);
                                 String newUsers = "";
                                 String[] mParts = mAccepted.split(mUser.getUID());
                                 boolean rightIsEmpty = mParts[1].length() > 1;
@@ -1055,7 +1104,7 @@ public class Linker {
                                 for (DataSnapshot mSnap : dataSnapshot.getChildren()) {
                                     if (mSnap.getKey().equals(Consts.Fb_Keys.MGR_SEC_USERS_ACCEPTED)) {
                                         String mAccepted = mSnap.getValue().toString();
-                                        mTask.addParam(Consts.Param_Keys.KEY_ACCEPTED_USERS_STRING, mAccepted);
+                                        mTask.addParamToTask(Consts.Param_Keys.KEY_ACCEPTED_USERS_STRING, mAccepted);
                                         mTask.onFinish();
                                         return;
                                     }
@@ -1179,7 +1228,7 @@ public class Linker {
         }
     }
 
-    private class BackgroundInfoFetcher extends AsyncTask<Void, Void, Void> {
+    public class BackgroundInfoFetcher extends AsyncTask<Void, Void, Void> {
 
         @Override
         protected Void doInBackground(Void... params) {

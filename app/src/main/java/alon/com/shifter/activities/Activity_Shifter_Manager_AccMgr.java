@@ -1,7 +1,7 @@
 package alon.com.shifter.activities;
 
 import android.annotation.SuppressLint;
-import android.app.ProgressDialog;
+import android.app.DialogFragment;
 import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -29,6 +29,7 @@ import alon.com.shifter.base_classes.FinishableTask;
 import alon.com.shifter.base_classes.FinishableTaskWithParams;
 import alon.com.shifter.base_classes.Linker;
 import alon.com.shifter.base_classes.TaskResult;
+import alon.com.shifter.dialog_fragments.ProgressDialogFragment;
 import alon.com.shifter.dialog_fragments.UserItemDialogFragment;
 import alon.com.shifter.utils.FirebaseUtil;
 
@@ -46,6 +47,7 @@ public class Activity_Shifter_Manager_AccMgr extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_shifter_accmgr);
 
         getUtil(this);
@@ -55,7 +57,7 @@ public class Activity_Shifter_Manager_AccMgr extends BaseActivity {
         if (gatesOpen)
             setupUI();
         else {
-            final ProgressDialog mDialog = mUtil.generateStandbyDialog(this);
+            final ProgressDialogFragment mDialog = mUtil.generateStandbyDialog(this);
             FinishableTask mTask = new FinishableTask() {
                 @Override
                 public void onFinish() {
@@ -116,6 +118,8 @@ public class Activity_Shifter_Manager_AccMgr extends BaseActivity {
                                 mDialog.setTask(mTask);
                                 mDialog.setUser(mUsersList.get(position).getUser());
                                 mDialog.setCon(Activity_Shifter_Manager_AccMgr.this);
+                                mDialog.setTitle(getString(R.string.mgr_accmgr_title));
+                                mDialog.setStyle(DialogFragment.STYLE_NO_TITLE, 0);
                                 mDialog.show(getFragmentManager(), "");
                             } else
                                 Activity_Shifter_Manager_AccMgr.this.runOnUiThread(new Runnable() {
@@ -258,8 +262,8 @@ public class Activity_Shifter_Manager_AccMgr extends BaseActivity {
             final FinishableTaskWithParams mTask = new FinishableTaskWithParams() {
                 @Override
                 public void onFinish() {
-                    if (getParams().containsKey(Param_Keys.KEY_BASE_USER_OBJECT)) {
-                        setUser((BaseUser) getParams().get(Param_Keys.KEY_BASE_USER_OBJECT));
+                    if (getParamsFromTask().containsKey(Param_Keys.KEY_BASE_USER_OBJECT)) {
+                        setUser((BaseUser) getParamsFromTask().get(Param_Keys.KEY_BASE_USER_OBJECT));
                         setApproved(approved);
                         task.onFinish();
                     } else

@@ -96,22 +96,25 @@ public final class SpecSettings implements Serializable {
 
     @Override
     public String toString() {
-        JSONObject mJson = new JSONObject();
-        try {
-            for (String mHeader : mHeaders) {
-                ArrayList<String> mChildList = getChildrenArrayList(mHeader);
-                if (mChildList != null) {
-                    JSONArray mArr = new JSONArray();
-                    for (String mChild : mChildList)
-                        mArr.put(mChild);
-                    mJson.put(mHeader, mArr);
-                } else
-                    mJson.put(mHeader, 0);
+        if (!isEmpty()) {
+            JSONObject mJson = new JSONObject();
+            try {
+                for (String mHeader : mHeaders) {
+                    ArrayList<String> mChildList = getChildrenArrayList(mHeader);
+                    if (mChildList != null) {
+                        JSONArray mArr = new JSONArray();
+                        for (String mChild : mChildList)
+                            mArr.put(mChild);
+                        mJson.put(mHeader, mArr);
+                    } else
+                        mJson.put(mHeader, 0);
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
             }
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-        return mJson.toString();
+            return mJson.toString();
+        } else
+            return "{}";
     }
 
     @Override

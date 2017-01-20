@@ -2,6 +2,7 @@ package alon.com.shifter.activities;
 
 import android.app.Dialog;
 import android.app.TimePickerDialog;
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -40,15 +41,16 @@ public class Activity_Shift_Hour_Setting extends BaseActivity implements TimePic
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (getIntent() != null && getIntent().getExtras() != null) {
+            mChangeText = getIntent().getExtras().getBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON);
+            mShiftHours = (ShiftHours) getIntent().getExtras().getSerializable(Strings.FILE_SHIFT_HOURS_OBJECT);
+
+        }
         setContentView(R.layout.activity_shift_hour_setting);
 
         getUtil(this);
         TAG = "Shifter_Hour_Settings";
 
-        if (getIntent().getExtras() != null) {
-            mChangeText = getIntent().getExtras().getBoolean(Strings.KEY_SHOULD_CHANGE_BACK_BUTTON);
-            mShiftHours = (ShiftHours) getIntent().getExtras().getSerializable(Strings.FILE_SHIFT_HOURS_OBJECT);
-        }
         if (mShiftHours == null)
             mShiftHours = (ShiftHours) mUtil.readObject(this, Strings.FILE_SHIFT_HOURS_OBJECT);
         setupUI();
@@ -81,7 +83,7 @@ public class Activity_Shift_Hour_Setting extends BaseActivity implements TimePic
         if (mShiftHours != null) {
             String mChangedText = getString(R.string.mgr_msg_hour_set);
             for (int i = 1; i < 5; i++)
-                if (mShiftHours.getHour(i) != null)
+                if (mShiftHours.getHour(i - 1) != null) {
                     switch (i) {
                         case MORN:
                             mChangedText = getString(R.string.shift_title_morn) + " " + mChangedText;
@@ -100,6 +102,8 @@ public class Activity_Shift_Hour_Setting extends BaseActivity implements TimePic
                             mNight.setText(mChangedText);
                             break;
                     }
+                    mChangedText = getString(R.string.mgr_msg_hour_set);
+                }
         }
 
         Calendar mCal = Calendar.getInstance();
@@ -119,21 +123,15 @@ public class Activity_Shift_Hour_Setting extends BaseActivity implements TimePic
         switch (v.getId()) {
             case R.id.MGR_SHS_morn_hour_set:
                 mCurrentTime = MORN;
-                mFromHour.show();
                 break;
             case R.id.MGR_SHS_afr_non_hour_set:
                 mCurrentTime = AFR_NON;
-                mFromHour.show();
-
                 break;
             case R.id.MGR_SHS_evening_hour_set:
                 mCurrentTime = EVENING;
-                mFromHour.show();
-
                 break;
             case R.id.MGR_SHS_night_hour_set:
                 mCurrentTime = NIGHT;
-                mFromHour.show();
                 break;
             case R.id.MGR_SHS_done:
                 mUtil.writeObject(this, Strings.FILE_SHIFT_HOURS_OBJECT, mShiftHours);
@@ -141,8 +139,22 @@ public class Activity_Shift_Hour_Setting extends BaseActivity implements TimePic
                     mUtil.changeScreen(this, Activity_Shifter_Manager_Settings.class);
                 else
                     mUtil.changeScreen(this, Activity_Shifter_Main_Manager.class);
-                break;
+                return;
         }
+        if (mShiftHours != null && mShiftHours.getHour(mCurrentTime - 1) != null && !mShiftHours.getHour(mCurrentTime - 1).isEmpty()) {
+            String from = mShiftHours.getHour(mCurrentTime - 1).split("-")[0];
+            int hour = Integer.parseInt(from.split(":")[0]);
+            int min = Integer.parseInt(from.split(":")[1]);
+            mFromHour.updateTime(hour, min);
+        }
+        mFromHour.show();
+        mFromHour.getButton(DialogInterface.BUTTON_NEGATIVE).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mShiftItem = "";
+                mFromHour.dismiss();
+            }
+        });
     }
 
     @Override
@@ -151,11 +163,18 @@ public class Activity_Shift_Hour_Setting extends BaseActivity implements TimePic
         if (mFromHour.isShowing()) {
             mShiftItem = shiftTime + "-";
             mFromHour.dismiss();
+            if (mShiftHours != null && mShiftHours.getHour(mCurrentTime - 1) != null && !mShiftHours.getHour(mCurrentTime - 1).isEmpty()) {
+                String from = mShiftHours.getHour(mCurrentTime - 1).split("-")[1];
+                int hour = Integer.parseInt(from.split(":")[0]);
+                int min = Integer.parseInt(from.split(":")[1]);
+                mToHour.updateTime(hour, min);
+            }
             mToHour.show();
             mToHour.getButton(Dialog.BUTTON_NEGATIVE).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     mShiftItem = "";
+                    mToHour.dismiss();
                 }
             });
         } else if (mToHour.isShowing()) {

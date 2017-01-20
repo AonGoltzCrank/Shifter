@@ -21,19 +21,17 @@ public abstract class FinishableTaskWithParams extends FinishableTask {
     /**
      * Adds a param to {@link #mParams}.
      *
-     * @param key
-     *         - The parameter key {@link alon.com.shifter.base_classes.Consts.Param_Keys}.
-     * @param param
-     *         - The parameter itself.
+     * @param key   - The parameter key {@link alon.com.shifter.base_classes.Consts.Param_Keys}.
+     * @param param - The parameter itself.
      */
-    public void addParam(String key, Object param) {
+    public void addParamToTask(String key, Object param) {
         mParams.put(key, param);
     }
 
     /**
      * @return {@link #mParams}
      */
-    protected HashMap<String, Object> getParams() {
+    protected HashMap<String, Object> getParamsFromTask() {
         return mParams;
     }
 }

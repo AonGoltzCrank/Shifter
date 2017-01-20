@@ -18,7 +18,7 @@ public class ProgressDialogFragment extends DialogFragment {
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View mView = inflater.inflate(R.layout.dialog_fragment_connecting, container, true);
+        View mView = inflater.inflate(R.layout.dialog_fragment_progress, container, true);
 
         ((TextView) mView.findViewById(R.id.dialog_title)).setText(mTitle);
         ((TextView) mView.findViewById(R.id.DF_CONN_message)).setText(mMessage);
@@ -32,5 +32,7 @@ public class ProgressDialogFragment extends DialogFragment {
 
     public void setMessage(String msg) {
         mMessage = msg;
+        if (getView() != null)
+            ((TextView) getView().findViewById(R.id.DF_CONN_message)).setText(msg);
     }
 }
